@@ -147,6 +147,7 @@ export default function Home() {
   const [plan, setPlan] = useState<Plan>('free');
   const [generationCount, setGenerationCount] = useState(0);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
 
   // プランと生成回数の初期化
   useEffect(() => {
@@ -411,13 +412,88 @@ export default function Home() {
 
         {outline && (
           <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <h2 className="text-2xl font-bold text-gray-900">レポート構成</h2>
-              {outline.hasFallback && (
-                <span className="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
-                  暫定構成を表示しています
-                </span>
-              )}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                {outline.hasFallback && (
+                  <span className="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                    暫定構成を表示しています
+                  </span>
+                )}
+                {/* 書き出しボタン（Pro限定） */}
+                <div className="flex items-center gap-2 relative">
+                  <button
+                    disabled={plan === 'free'}
+                    onClick={() => {
+                      if (plan === 'free') {
+                        setShowTooltip(!showTooltip);
+                        setTimeout(() => setShowTooltip(false), 3000);
+                      }
+                      // PDF書き出し機能（未実装）
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
+                      plan === 'free'
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-red-600 text-white hover:bg-red-700'
+                    }`}
+                    title={plan === 'free' ? 'Proプラン限定機能です' : 'PDF書き出し'}
+                  >
+                    {plan === 'free' && <span>🔒</span>}
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                      />
+                    </svg>
+                    PDF
+                  </button>
+                  <button
+                    disabled={plan === 'free'}
+                    onClick={() => {
+                      if (plan === 'free') {
+                        setShowTooltip(!showTooltip);
+                        setTimeout(() => setShowTooltip(false), 3000);
+                      }
+                      // Word書き出し機能（未実装）
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
+                      plan === 'free'
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                    title={plan === 'free' ? 'Proプラン限定機能です' : 'Word書き出し'}
+                  >
+                    {plan === 'free' && <span>🔒</span>}
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    Word
+                  </button>
+                  {showTooltip && plan === 'free' && (
+                    <div className="absolute top-full right-0 mt-2 bg-gray-900 text-white text-sm px-3 py-2 rounded-md shadow-lg z-10 whitespace-nowrap">
+                      Proプラン限定機能です
+                      <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             {outline.hasFallback && (
               <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
@@ -452,6 +528,63 @@ export default function Home() {
                   )}
                 </div>
               ))}
+            </div>
+
+            {/* 参考文献リスト提案セクション（Pro限定） */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-semibold text-gray-800">
+                    参考文献リスト提案
+                  </h3>
+                  {plan === 'free' && (
+                    <div className="relative group">
+                      <span className="text-lg">🔒</span>
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-gray-900 text-white text-sm px-3 py-2 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                        Proプラン限定機能です
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 w-2 h-2 bg-gray-900 rotate-45"></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {plan === 'free' && (
+                  <Link
+                    href="/pricing"
+                    className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+                  >
+                    Proプランにアップグレード →
+                  </Link>
+                )}
+              </div>
+              {plan === 'free' ? (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                  <p className="text-gray-600 mb-3">
+                    参考文献リストの自動提案はProプラン限定機能です
+                  </p>
+                  <Link
+                    href="/pricing"
+                    className="inline-block bg-purple-600 text-white px-4 py-2 rounded-md font-medium hover:bg-purple-700 transition-colors text-sm"
+                  >
+                    Proプランを確認する
+                  </Link>
+                </div>
+              ) : (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-700 mb-3">
+                    分野「{field}」に関連する参考文献候補：
+                  </p>
+                  <ul className="space-y-2 text-sm text-gray-600">
+                    <li className="flex items-start">
+                      <span className="text-blue-500 mr-2">•</span>
+                      <span>参考文献提案機能は準備中です</span>
+                    </li>
+                    <li className="flex items-start">
+                      <span className="text-blue-500 mr-2">•</span>
+                      <span>Proプランでは自動で参考文献リストを生成します</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         )}
