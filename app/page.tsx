@@ -278,7 +278,7 @@ export default function Home() {
                   <h3 className="text-xl font-semibold text-gray-800 mb-3">
                     {section.title}
                   </h3>
-                  {section.points.length > 0 ? (
+                  {section.points && section.points.length > 0 ? (
                     <ul className="space-y-2">
                       {section.points.map((point, pointIndex) => (
                         <li key={pointIndex} className="text-gray-700 flex items-start">
@@ -287,6 +287,10 @@ export default function Home() {
                         </li>
                       ))}
                     </ul>
+                  ) : section.isFallback ? (
+                    <p className="text-amber-600 text-sm italic bg-amber-50 px-3 py-2 rounded">
+                      暫定構成を表示しています
+                    </p>
                   ) : (
                     <p className="text-gray-500 text-sm italic">
                       論点が生成されませんでした。
