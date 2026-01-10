@@ -263,7 +263,9 @@ export async function generatePoints(
       console.error('[generatePoints] OpenAI.APIError 発生 - フォールバック論点を返します');
       console.error('[generatePoints] error.message:', error.message);
       console.error('[generatePoints] error.status:', error.status);
-      console.error('[generatePoints] error.response:', error.response);
+      if (error.response) {
+        console.error('[generatePoints] error.response:', error.response);
+      }
       return {
         points: getFallbackPoints(field, sectionTitle),
         isFallback: true,
@@ -272,9 +274,10 @@ export async function generatePoints(
     
     // その他のエラー
     console.error('[generatePoints] 予期しないエラー - フォールバック論点を返します');
-    console.error('[generatePoints] error.message:', error instanceof Error ? error.message : 'N/A');
-    console.error('[generatePoints] error.response:', (error as any)?.response || 'N/A');
-    console.error('[generatePoints] full error:', error);
+    if (error instanceof Error) {
+      console.error('[generatePoints] error.message:', error.message);
+    }
+    console.error('[generatePoints] error:', error);
     return {
       points: getFallbackPoints(field, sectionTitle),
       isFallback: true,
