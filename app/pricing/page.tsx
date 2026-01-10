@@ -23,13 +23,20 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         {/* ヘッダー */}
         <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            AXON 料金プラン
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-2">
+            AXON
           </h1>
+          <p className="text-sm text-gray-500 mb-4">文系レポ助</p>
+          <p className="text-lg text-gray-600 italic mb-6">
+            書けないを、構造で解決する。
+          </p>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
+            料金プラン
+          </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             あなたの学術レポート作成を支援します。学生の皆様に最適なプランをお選びください。
           </p>
@@ -243,15 +250,6 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* フッターCTA */}
-        <div className="text-center">
-          <Link
-            href="/"
-            className="inline-block text-purple-600 hover:text-purple-700 font-medium"
-          >
-            ← トップページに戻る
-          </Link>
-        </div>
       </div>
     </div>
   );

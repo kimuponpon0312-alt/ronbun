@@ -257,7 +257,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="bg-gray-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         {/* プラン切り替えUI */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
@@ -300,16 +300,14 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            文系レポート構成ジェネレーター
+        <div className="text-center mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+            AXON
           </h1>
-          <Link
-            href="/pricing"
-            className="text-purple-600 hover:text-purple-700 font-medium text-sm"
-          >
-            料金プラン →
-          </Link>
+          <p className="text-sm text-gray-500 mb-1">文系レポ助</p>
+          <p className="text-lg text-gray-600 italic">
+            書けないを、構造で解決する。
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6 mb-8">
