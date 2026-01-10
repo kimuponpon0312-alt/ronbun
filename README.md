@@ -7,13 +7,38 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 プロジェクトのルートディレクトリに `.env.local` ファイルを作成し、以下の環境変数を設定してください：
 
 ```env
-# OpenAI API
-OPENAI_API_KEY=your_openai_api_key_here
+# NextAuth.js
+NEXTAUTH_SECRET=your_nextauth_secret_here
+NEXTAUTH_URL=http://localhost:3000
+
+# Email Provider (マジックリンク認証用)
+EMAIL_SERVER_HOST=smtp.gmail.com
+EMAIL_SERVER_PORT=587
+EMAIL_SERVER_USER=your_email@gmail.com
+EMAIL_SERVER_PASSWORD=your_email_app_password
+EMAIL_FROM=noreply@axon.example.com
 
 # Supabase (オプショナル - 統計保存機能を使用する場合)
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 ```
+
+#### NextAuth.jsの設定
+
+`NEXTAUTH_SECRET`は、以下のコマンドで生成できます：
+
+```bash
+openssl rand -base64 32
+```
+
+または、[NextAuth.js Secret Generator](https://generate-secret.vercel.app/32)を使用してください。
+
+#### Email Providerの設定
+
+Gmailを使用する場合：
+1. Googleアカウントの設定から「2段階認証」を有効化
+2. 「アプリパスワード」を生成
+3. 生成したアプリパスワードを`EMAIL_SERVER_PASSWORD`に設定
 
 ### Supabaseのセットアップ（オプショナル）
 

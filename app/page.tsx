@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { generatePoints } from './actions/generatePoints';
 import { saveStatistics } from './actions/saveStatistics';
 import { saveShareData } from './actions/saveShareData';
@@ -45,9 +46,12 @@ type ReportOutline = {
 const STORAGE_KEY_PLAN = 'report_designer_plan';
 const STORAGE_KEY_DESIGN_COUNT = 'report_designer_count';
 const STORAGE_KEY_LAST_DESIGN_DATE = 'report_designer_last_date';
+const STORAGE_KEY_GUEST_DESIGN_COUNT = 'report_designer_guest_count';
+const STORAGE_KEY_GUEST_LAST_DESIGN_DATE = 'report_designer_guest_last_date';
 
-// Freeプランの制限（1日5回）
-const FREE_PLAN_LIMIT = 5;
+// 生成回数制限
+const GUEST_LIMIT = 1; // 未ログイン：1日1回
+const FREE_PLAN_LIMIT = 5; // ログイン済み（Free）：1日5回
 
 // セクション構成を定義（タイトルのみ、論点はテンプレートから設計）
 const sectionTemplates: Record<Field, (length: number) => Section[]> = {
@@ -130,6 +134,7 @@ async function designOutline(
 }
 
 export default function Home() {
+  const { data: session, status } = useSession();
   const [field, setField] = useState<Field>('law');
   const [question, setQuestion] = useState('');
   const [wordCount, setWordCount] = useState(3000);
@@ -137,12 +142,13 @@ export default function Home() {
   const [outline, setOutline] = useState<ReportOutline | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [plan, setPlan] = useState<Plan>('free');
-  const [designCount, setDesignCount] = useState(0); // 生成→設計に変更
+  const [designCount, setDesignCount] = useState(0);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [hasShareRef, setHasShareRef] = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
 
   // URLパラメータからref=share10をチェック
   useEffect(() => {
@@ -163,29 +169,43 @@ export default function Home() {
     }
   }, []);
 
-  // プランと設計回数の初期化
+  // プランと設計回数の初期化（認証状態に応じて分岐）
   useEffect(() => {
-    // プランをlocalStorageから読み込み
-    const savedPlan = localStorage.getItem(STORAGE_KEY_PLAN) as Plan | null;
-    if (savedPlan === 'free' || savedPlan === 'pro') {
-      setPlan(savedPlan);
-    }
+    if (status === 'loading') return; // 認証状態の読み込み中は待機
 
-    // 設計回数と日付をチェック
-    const lastDate = localStorage.getItem(STORAGE_KEY_LAST_DESIGN_DATE);
+    const isLoggedIn = !!session;
     const today = new Date().toISOString().split('T')[0];
 
-    if (lastDate === today) {
-      // 今日の日付なら回数を読み込み
-      const count = parseInt(localStorage.getItem(STORAGE_KEY_DESIGN_COUNT) || '0', 10);
-      setDesignCount(count);
+    if (isLoggedIn) {
+      // ログイン済み：プランをlocalStorageから読み込み
+      const savedPlan = localStorage.getItem(STORAGE_KEY_PLAN) as Plan | null;
+      if (savedPlan === 'free' || savedPlan === 'pro') {
+        setPlan(savedPlan);
+      }
+
+      // ログイン済みの設計回数と日付をチェック
+      const lastDate = localStorage.getItem(STORAGE_KEY_LAST_DESIGN_DATE);
+      if (lastDate === today) {
+        const count = parseInt(localStorage.getItem(STORAGE_KEY_DESIGN_COUNT) || '0', 10);
+        setDesignCount(count);
+      } else {
+        setDesignCount(0);
+        localStorage.setItem(STORAGE_KEY_DESIGN_COUNT, '0');
+        localStorage.setItem(STORAGE_KEY_LAST_DESIGN_DATE, today);
+      }
     } else {
-      // 日付が変わっていたらリセット
-      setDesignCount(0);
-      localStorage.setItem(STORAGE_KEY_DESIGN_COUNT, '0');
-      localStorage.setItem(STORAGE_KEY_LAST_DESIGN_DATE, today);
+      // 未ログイン：ゲストの設計回数と日付をチェック
+      const lastGuestDate = localStorage.getItem(STORAGE_KEY_GUEST_LAST_DESIGN_DATE);
+      if (lastGuestDate === today) {
+        const count = parseInt(localStorage.getItem(STORAGE_KEY_GUEST_DESIGN_COUNT) || '0', 10);
+        setDesignCount(count);
+      } else {
+        setDesignCount(0);
+        localStorage.setItem(STORAGE_KEY_GUEST_DESIGN_COUNT, '0');
+        localStorage.setItem(STORAGE_KEY_GUEST_LAST_DESIGN_DATE, today);
+      }
     }
-  }, []);
+  }, [session, status]);
 
   // Freeプランの場合、指導教員タイプを固定（理論重視型のみ）
   useEffect(() => {
@@ -200,38 +220,76 @@ export default function Home() {
     localStorage.setItem(STORAGE_KEY_PLAN, newPlan);
   };
 
-  // 設計回数を更新
+  // 設計回数を更新（認証状態に応じて分岐）
   const incrementDesignCount = () => {
+    const isLoggedIn = !!session;
     const today = new Date().toISOString().split('T')[0];
-    const lastDate = localStorage.getItem(STORAGE_KEY_LAST_DESIGN_DATE);
-    
-    // 日付が変わっていたらリセット
-    if (lastDate !== today) {
-      setDesignCount(1);
-      localStorage.setItem(STORAGE_KEY_DESIGN_COUNT, '1');
-      localStorage.setItem(STORAGE_KEY_LAST_DESIGN_DATE, today);
+
+    if (isLoggedIn) {
+      // ログイン済み：通常のカウント
+      const lastDate = localStorage.getItem(STORAGE_KEY_LAST_DESIGN_DATE);
+      if (lastDate !== today) {
+        setDesignCount(1);
+        localStorage.setItem(STORAGE_KEY_DESIGN_COUNT, '1');
+        localStorage.setItem(STORAGE_KEY_LAST_DESIGN_DATE, today);
+      } else {
+        const newCount = designCount + 1;
+        setDesignCount(newCount);
+        localStorage.setItem(STORAGE_KEY_DESIGN_COUNT, newCount.toString());
+      }
     } else {
-      // 同じ日ならカウントをインクリメント
-      const newCount = designCount + 1;
-      setDesignCount(newCount);
-      localStorage.setItem(STORAGE_KEY_DESIGN_COUNT, newCount.toString());
+      // 未ログイン：ゲストのカウント
+      const lastGuestDate = localStorage.getItem(STORAGE_KEY_GUEST_LAST_DESIGN_DATE);
+      if (lastGuestDate !== today) {
+        setDesignCount(1);
+        localStorage.setItem(STORAGE_KEY_GUEST_DESIGN_COUNT, '1');
+        localStorage.setItem(STORAGE_KEY_GUEST_LAST_DESIGN_DATE, today);
+      } else {
+        const newCount = designCount + 1;
+        setDesignCount(newCount);
+        localStorage.setItem(STORAGE_KEY_GUEST_DESIGN_COUNT, newCount.toString());
+      }
     }
   };
 
-  // 設計可能かチェック
+  // 設計可能かチェック（認証状態とプランに応じて）
   const canDesign = (): boolean => {
-    if (plan === 'pro') {
-      return true; // Proプランは無制限
+    const isLoggedIn = !!session;
+    
+    if (isLoggedIn) {
+      // ログイン済み
+      if (plan === 'pro') {
+        return true; // Proプランは無制限
+      }
+      return designCount < FREE_PLAN_LIMIT; // Freeプランは1日5回まで
+    } else {
+      // 未ログイン：1日1回まで
+      return designCount < GUEST_LIMIT;
     }
-    return designCount < FREE_PLAN_LIMIT; // Freeプランは1日5回まで
+  };
+
+  // 現在の制限回数を取得
+  const getCurrentLimit = (): number => {
+    const isLoggedIn = !!session;
+    if (isLoggedIn) {
+      return plan === 'pro' ? Infinity : FREE_PLAN_LIMIT;
+    }
+    return GUEST_LIMIT;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Freeプランの制限チェック
+    // 設計回数制限チェック（認証状態に応じて分岐）
     if (!canDesign()) {
-      setShowLimitModal(true);
+      const isLoggedIn = !!session;
+      if (isLoggedIn) {
+        // ログイン済み：通常の制限モーダル
+        setShowLimitModal(true);
+      } else {
+        // 未ログイン：登録促進モーダル
+        setShowRegisterModal(true);
+      }
       return;
     }
 
@@ -311,46 +369,68 @@ export default function Home() {
   return (
     <div className="bg-gray-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* プラン切り替えUI */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <span className="text-sm font-medium text-gray-700">プラン:</span>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handlePlanChange('free')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    plan === 'free'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Free
-                </button>
-                <button
-                  onClick={() => handlePlanChange('pro')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    plan === 'pro'
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Pro
-                </button>
+        {/* プラン切り替えUI（ログイン済みのみ表示） */}
+        {session && (
+          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm font-medium text-gray-700">プラン:</span>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handlePlanChange('free')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      plan === 'free'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Free
+                  </button>
+                  <button
+                    onClick={() => handlePlanChange('pro')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      plan === 'pro'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    Pro
+                  </button>
+                </div>
               </div>
+              {plan === 'free' ? (
+                <div className="text-sm text-gray-600">
+                  本日の残り: {FREE_PLAN_LIMIT - designCount}回
+                </div>
+              ) : (
+                <div className="text-sm text-purple-600 font-medium">
+                  🔓 無制限
+                </div>
+              )}
             </div>
-            {plan === 'free' && (
-              <div className="text-sm text-gray-600">
-                本日の残り: {FREE_PLAN_LIMIT - designCount}回
-              </div>
-            )}
-            {plan === 'pro' && (
-              <div className="text-sm text-purple-600 font-medium">
-                🔓 無制限
-              </div>
-            )}
           </div>
-        </div>
+        )}
+
+        {/* 未ログイン時の制限表示 */}
+        {!session && (
+          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                <span className="font-medium">本日の残り: </span>
+                <span className={designCount < GUEST_LIMIT ? 'text-green-600' : 'text-red-600'}>
+                  {GUEST_LIMIT - designCount}回
+                </span>
+                <span className="text-gray-500 ml-2">（未ログイン）</span>
+              </div>
+              <Link
+                href="/auth/signin"
+                className="text-sm font-medium text-purple-600 hover:text-purple-700 transition-colors"
+              >
+                無料登録で1日5回まで →
+              </Link>
+            </div>
+          </div>
+        )}
 
         <div className="text-center mb-8">
           {/* シェア割引バナー */}
@@ -493,8 +573,19 @@ export default function Home() {
               disabled={isLoading || !canDesign()}
               className="w-full bg-blue-600 text-white py-3 px-4 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {isLoading ? '設計中...' : canDesign() ? '構造を提示する' : '1日の制限に達しました'}
+              {isLoading
+                ? '設計中...'
+                : canDesign()
+                  ? '構造を提示する'
+                  : session
+                    ? '1日の制限に達しました'
+                    : '本日の制限に達しました（無料登録で1日5回まで）'}
             </button>
+            {!session && (
+              <p className="text-xs text-gray-500 text-center mt-2">
+                無料登録すると、1日5回までレポート構造を設計できます
+              </p>
+            )}
           </div>
         </form>
 
@@ -707,15 +798,15 @@ export default function Home() {
                   </div>
                   <p className="mt-4 text-xs text-gray-500 italic">
                     Proプランでは、学術的に評価されやすい参考文献の構造的カテゴリを自動で提示します
-                  </p>
-                </div>
+          </p>
+        </div>
               )}
             </div>
           </div>
         )}
 
-        {/* 制限超過モーダル */}
-        {showLimitModal && (
+        {/* 制限超過モーダル（ログイン済み） */}
+        {showLimitModal && session && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
               <h3 className="text-xl font-bold text-gray-900 mb-4">
@@ -739,6 +830,37 @@ export default function Home() {
                   className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md font-medium hover:bg-purple-700 transition-colors"
                 >
                   Proプランに切り替え
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 登録促進モーダル（未ログイン） */}
+        {showRegisterModal && !session && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">
+                本日の制限に達しました
+              </h3>
+              <p className="text-gray-700 mb-6">
+                無料登録すると、1日5回までレポート構成を生成できます。
+                <br />
+                パスワード不要のマジックリンク認証で、簡単に登録できます。
+              </p>
+              <div className="flex flex-col space-y-3">
+                <Link
+                  href="/auth/signin"
+                  className="w-full bg-purple-600 text-white py-2 px-4 rounded-md font-medium hover:bg-purple-700 transition-colors text-center"
+                  onClick={() => setShowRegisterModal(false)}
+                >
+                  無料登録する
+                </Link>
+                <button
+                  onClick={() => setShowRegisterModal(false)}
+                  className="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-md font-medium hover:bg-gray-300 transition-colors"
+                >
+                  閉じる
                 </button>
               </div>
             </div>
@@ -810,7 +932,7 @@ export default function Home() {
             </div>
           </div>
         )}
-      </div>
+        </div>
     </div>
   );
 }
