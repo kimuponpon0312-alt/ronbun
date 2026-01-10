@@ -1,5 +1,24 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## セットアップ
+
+### 環境変数の設定
+
+プロジェクトのルートディレクトリに `.env.local` ファイルを作成し、以下の環境変数を設定してください：
+
+```env
+# OpenAI API
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Supabase (オプショナル - 統計保存機能を使用する場合)
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
+
+### Supabaseのセットアップ（オプショナル）
+
+統計保存機能を使用する場合、Supabaseプロジェクトを作成し、`supabase_schema.sql` ファイルのSQLをSupabaseのSQL Editorで実行してください。
+
 ## Getting Started
 
 First, run the development server:
