@@ -1,16 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { generatePoints } from './actions/generatePoints';
+import { saveStatistics } from './actions/saveStatistics';
 
 type GeneratePointsResult = {
   points: string[];
   isFallback: boolean;
 };
-import { saveStatistics } from './actions/saveStatistics';
 
 type Field = '法学' | '経済学' | '文学' | '社会学';
 type InstructorType = '厳格型' | '実務重視型' | '理論重視型' | '柔軟型';
+type Plan = 'free' | 'pro';
 
 type Section = {
   title: string;
@@ -22,6 +23,14 @@ type ReportOutline = {
   sections: Section[];
   hasFallback?: boolean; // フォールバックが使用されたかどうか
 };
+
+// LocalStorage のキー
+const STORAGE_KEY_PLAN = 'report_generator_plan';
+const STORAGE_KEY_GENERATION_COUNT = 'report_generator_count';
+const STORAGE_KEY_LAST_GENERATION_DATE = 'report_generator_last_date';
+
+// Freeプランの制限
+const FREE_PLAN_LIMIT = 5;
 
 // セクション構成を定義（タイトルのみ、論点はAIで生成）
 const sectionTemplates: Record<Field, (length: number) => Section[]> = {
@@ -134,11 +143,91 @@ export default function Home() {
   const [outline, setOutline] = useState<ReportOutline | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [plan, setPlan] = useState<Plan>('free');
+  const [generationCount, setGenerationCount] = useState(0);
+  const [showLimitModal, setShowLimitModal] = useState(false);
+
+  // プランと生成回数の初期化
+  useEffect(() => {
+    // プランをlocalStorageから読み込み
+    const savedPlan = localStorage.getItem(STORAGE_KEY_PLAN) as Plan | null;
+    if (savedPlan === 'free' || savedPlan === 'pro') {
+      setPlan(savedPlan);
+    }
+
+    // 生成回数と日付をチェック
+    const lastDate = localStorage.getItem(STORAGE_KEY_LAST_GENERATION_DATE);
+    const today = new Date().toISOString().split('T')[0];
+
+    if (lastDate === today) {
+      // 今日の日付なら回数を読み込み
+      const count = parseInt(localStorage.getItem(STORAGE_KEY_GENERATION_COUNT) || '0', 10);
+      setGenerationCount(count);
+    } else {
+      // 日付が変わっていたらリセット
+      setGenerationCount(0);
+      localStorage.setItem(STORAGE_KEY_GENERATION_COUNT, '0');
+      localStorage.setItem(STORAGE_KEY_LAST_GENERATION_DATE, today);
+    }
+  }, []);
+
+  // Freeプランの場合、指導教員タイプを固定
+  useEffect(() => {
+    if (plan === 'free') {
+      setInstructorType('理論重視型');
+    }
+  }, [plan]);
+
+  // Freeプランの場合、指導教員タイプを固定
+  useEffect(() => {
+    if (plan === 'free') {
+      setInstructorType('理論重視型');
+    }
+  }, [plan]);
+
+  // プラン変更時の処理
+  const handlePlanChange = (newPlan: Plan) => {
+    setPlan(newPlan);
+    localStorage.setItem(STORAGE_KEY_PLAN, newPlan);
+  };
+
+  // 生成回数を更新
+  const incrementGenerationCount = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const lastDate = localStorage.getItem(STORAGE_KEY_LAST_GENERATION_DATE);
+    
+    // 日付が変わっていたらリセット
+    if (lastDate !== today) {
+      setGenerationCount(1);
+      localStorage.setItem(STORAGE_KEY_GENERATION_COUNT, '1');
+      localStorage.setItem(STORAGE_KEY_LAST_GENERATION_DATE, today);
+    } else {
+      // 同じ日ならカウントをインクリメント
+      const newCount = generationCount + 1;
+      setGenerationCount(newCount);
+      localStorage.setItem(STORAGE_KEY_GENERATION_COUNT, newCount.toString());
+    }
+  };
+
+  // 生成可能かチェック
+  const canGenerate = (): boolean => {
+    if (plan === 'pro') {
+      return true; // Proプランは無制限
+    }
+    return generationCount < FREE_PLAN_LIMIT; // Freeプランは1日5回まで
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError(null);
+
+    // Freeプランの制限チェック
+    if (!canGenerate()) {
+      setShowLimitModal(true);
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
       // 統計を保存（エラーが発生しても処理は継続）
@@ -154,6 +243,9 @@ export default function Home() {
         instructorType
       );
       setOutline(generatedOutline);
+
+      // 生成回数をカウント
+      incrementGenerationCount();
     } catch (err) {
       setError('レポート構成の生成に失敗しました。再度お試しください。');
       console.error('Error generating outline:', err);
@@ -165,6 +257,47 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
+        {/* プラン切り替えUI */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <span className="text-sm font-medium text-gray-700">プラン:</span>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => handlePlanChange('free')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    plan === 'free'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Free
+                </button>
+                <button
+                  onClick={() => handlePlanChange('pro')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    plan === 'pro'
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Pro
+                </button>
+              </div>
+            </div>
+            {plan === 'free' && (
+              <div className="text-sm text-gray-600">
+                本日の残り: {FREE_PLAN_LIMIT - generationCount}回
+              </div>
+            )}
+            {plan === 'pro' && (
+              <div className="text-sm text-purple-600 font-medium">
+                🔓 無制限
+              </div>
+            )}
+          </div>
+        </div>
+
         <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">
           文系レポート構成ジェネレーター
         </h1>
@@ -222,29 +355,41 @@ export default function Home() {
             </div>
 
             <div>
-              <label htmlFor="instructorType" className="block text-sm font-medium text-gray-700 mb-2">
-                指導教員タイプ
-              </label>
+              <div className="flex items-center gap-2 mb-2">
+                <label htmlFor="instructorType" className="block text-sm font-medium text-gray-700">
+                  指導教員タイプ
+                </label>
+                {plan === 'free' && (
+                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
+                    🔒 Pro限定
+                  </span>
+                )}
+              </div>
               <select
                 id="instructorType"
                 value={instructorType}
                 onChange={(e) => setInstructorType(e.target.value as InstructorType)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                disabled={isLoading}
+                disabled={isLoading || plan === 'free'}
               >
                 <option value="厳格型">厳格型 - 厳密な論理構成を重視</option>
                 <option value="実務重視型">実務重視型 - 実務的な観点を重視</option>
                 <option value="理論重視型">理論重視型 - 理論的フレームワークを重視</option>
                 <option value="柔軟型">柔軟型 - 創造的な視点を重視</option>
               </select>
+              {plan === 'free' && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Freeプランでは「理論重視型」のみ利用可能です
+                </p>
+              )}
             </div>
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !canGenerate()}
               className="w-full bg-blue-600 text-white py-3 px-4 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {isLoading ? '生成中...' : '構成を生成'}
+              {isLoading ? '生成中...' : canGenerate() ? '構成を生成' : '1日の制限に達しました'}
             </button>
           </div>
         </form>
@@ -298,6 +443,37 @@ export default function Home() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* 制限超過モーダル */}
+        {showLimitModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">
+                1日の制限に達しました
+              </h3>
+              <p className="text-gray-700 mb-6">
+                Freeプランでは1日5回まで生成可能です。本日の生成回数が上限に達しました。
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowLimitModal(false)}
+                  className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-md font-medium hover:bg-gray-300 transition-colors"
+                >
+                  閉じる
+                </button>
+                <button
+                  onClick={() => {
+                    handlePlanChange('pro');
+                    setShowLimitModal(false);
+                  }}
+                  className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md font-medium hover:bg-purple-700 transition-colors"
+                >
+                  Proプランに切り替え
+                </button>
+              </div>
             </div>
           </div>
         )}
