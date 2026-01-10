@@ -3,35 +3,94 @@
 type ShareButtonsProps = {
   shareUrl: string;
   title?: string;
+  description?: string; // サービス紹介文（レポート未生成時）
 };
 
-export default function ShareButtons({ shareUrl, title = 'AXON - 文系レポ助' }: ShareButtonsProps) {
+export default function ShareButtons({ shareUrl, title = 'AXON - 文系レポ助', description }: ShareButtonsProps) {
   // シェアURLにref=share10を付与
   const shareUrlWithRef = `${shareUrl}?ref=share10`;
 
-  // X（旧Twitter）でシェア
+  // デバイス判定（userAgentで分岐）
+  const isMobile = () => {
+    if (typeof window === 'undefined') return false;
+    const userAgent = navigator.userAgent || navigator.vendor;
+    return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+  };
+
+  // シェアテキストを生成（レポート生成後か未生成かで分岐）
+  const getShareText = () => {
+    if (description) {
+      // レポート未生成時：サービス紹介文
+      return `${description}\n\n${shareUrlWithRef}`;
+    } else {
+      // レポート生成後：レポート構造の共有
+      return `${title} のレポート構造を共有します。\n\n共有してくれた方にPro 10%割引！\n\n${shareUrlWithRef}`;
+    }
+  };
+
+  // X（旧Twitter）でシェア（PCは必ずブラウザ優先）
   const handleXShare = () => {
-    const text = `${title} のレポート構造を共有します。\n\n共有してくれた方にPro 10%割引！\n\n${shareUrlWithRef}`;
+    const text = getShareText();
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+    // PCは常にブラウザで開く（_blankで新規タブ）
     window.open(url, '_blank', 'width=550,height=420');
   };
 
-  // LINEでシェア
+  // LINEでシェア（PCは必ずブラウザ優先）
   const handleLineShare = () => {
-    const text = `${title} のレポート構造を共有します。\n\n共有してくれた方にPro 10%割引！\n\n${shareUrlWithRef}`;
+    const text = getShareText();
     const url = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrlWithRef)}&text=${encodeURIComponent(text)}`;
+    // PCは常にブラウザで開く（_blankで新規タブ）
     window.open(url, '_blank', 'width=550,height=420');
   };
 
-  // Instagramでシェア（Instagramは直接シェアできないため、クリップボードにコピー）
+  // Instagramでシェア（PC/スマホで分岐）
   const handleInstagramShare = async () => {
-    const text = `${title} のレポート構造を共有します。\n\n共有してくれた方にPro 10%割引！\n\n${shareUrlWithRef}`;
-    try {
-      await navigator.clipboard.writeText(text);
-      alert('テキストをクリップボードにコピーしました。Instagramに貼り付けてください。');
-    } catch (err) {
-      console.error('[handleInstagramShare] コピーに失敗:', err);
-      alert('コピーに失敗しました');
+    const text = getShareText();
+    const mobile = isMobile();
+
+    if (mobile) {
+      // スマホ: まずクリップボードにコピー、その後アプリ起動を試みる
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (err) {
+        console.error('[handleInstagramShare] クリップボードコピーに失敗:', err);
+      }
+
+      // Instagramアプリ起動を試みる（instagram://スキーム）
+      // iframeを使用してアプリ起動を試みる（ページ遷移を防ぐ）
+      const appUrl = `instagram://`;
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.src = appUrl;
+      document.body.appendChild(iframe);
+      
+      // iframeを即座に削除（アプリ起動をトリガーした後）
+      setTimeout(() => {
+        if (iframe.parentNode) {
+          document.body.removeChild(iframe);
+        }
+      }, 100);
+      
+      // アプリ起動後、ユーザーにメッセージを表示（テキストはクリップボードにコピー済み）
+      setTimeout(() => {
+        alert('テキストをクリップボードにコピーしました。\n\nInstagramアプリが開かない場合は、ブラウザで https://www.instagram.com/ を開いてください。');
+      }, 500);
+    } else {
+      // PC: ブラウザ版Instagramを新規タブで開く（必ずブラウザ優先）
+      const webUrl = `https://www.instagram.com/`;
+      window.open(webUrl, '_blank');
+      
+      // テキストをクリップボードにコピー
+      try {
+        await navigator.clipboard.writeText(text);
+        alert('Instagramブラウザ版を開きました。テキストもクリップボードにコピーしました。');
+      } catch (err) {
+        console.error('[handleInstagramShare] クリップボードコピーに失敗:', err);
+        alert('Instagramブラウザ版を開きました。');
+      }
     }
   };
 

@@ -290,24 +290,21 @@ export default function Home() {
     }
   };
 
-  // リンク共有モーダルを開く
+  // リンク共有モーダルを開く（レポート生成前でも開ける）
   const handleShareClick = () => {
-    if (shareUrl) {
-      setShowShareModal(true);
-    }
+    setShowShareModal(true);
   };
 
   // リンクをコピー（ref=share10を含む）
   const handleCopyLink = async () => {
-    if (shareUrl) {
-      try {
-        const urlWithRef = `${shareUrl}?ref=share10`;
-        await navigator.clipboard.writeText(urlWithRef);
-        alert('リンクをクリップボードにコピーしました');
-      } catch (err) {
-        console.error('[handleCopyLink] コピーに失敗:', err);
-        alert('リンクのコピーに失敗しました');
-      }
+    try {
+      const baseUrl = shareUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+      const urlWithRef = `${baseUrl}?ref=share10`;
+      await navigator.clipboard.writeText(urlWithRef);
+      alert('リンクをクリップボードにコピーしました');
+    } catch (err) {
+      console.error('[handleCopyLink] コピーに失敗:', err);
+      alert('リンクのコピーに失敗しました');
     }
   };
 
@@ -365,13 +362,43 @@ export default function Home() {
               </p>
             </div>
           )}
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-            AXON
-          </h1>
-          <p className="text-sm text-gray-500 mb-1">文系レポ助</p>
-          <p className="text-lg text-gray-600 italic">
-            書けないを、構造で解決する。
-          </p>
+          
+          {/* タイトルと共有ボタン（常時表示） */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex-1"></div>
+            <div className="flex-1 text-center">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                AXON
+              </h1>
+              <p className="text-sm text-gray-500 mb-1">文系レポ助</p>
+              <p className="text-lg text-gray-600 italic">
+                書けないを、構造で解決する。
+              </p>
+            </div>
+            {/* 常時表示の共有ボタン */}
+            <div className="flex-1 flex justify-end">
+              <button
+                onClick={handleShareClick}
+                className="flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors bg-green-600 text-white hover:bg-green-700 text-sm"
+                title={shareUrl ? 'リンクを共有' : 'サービスを共有'}
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                  />
+                </svg>
+                <span className="hidden sm:inline">共有</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6 mb-8">
@@ -493,29 +520,27 @@ export default function Home() {
               </div>
               {/* アクションボタン */}
               <div className="flex items-center gap-2 relative flex-wrap">
-                {/* リンク共有ボタン */}
-                {shareUrl && (
-                  <button
-                    onClick={handleShareClick}
-                    className="flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors bg-green-600 text-white hover:bg-green-700"
-                    title="リンクを共有"
+                {/* リンク共有ボタン（常時表示） */}
+                <button
+                  onClick={handleShareClick}
+                  className="flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors bg-green-600 text-white hover:bg-green-700"
+                  title={shareUrl ? 'リンクを共有' : 'サービスを共有'}
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
-                      />
-                    </svg>
-                    リンク共有
-                  </button>
-                )}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                    />
+                  </svg>
+                  {shareUrl ? 'リンク共有' : 'サービスを共有'}
+                </button>
 
                 {/* 書き出しボタン（Pro限定） */}
                 <button
@@ -720,13 +745,13 @@ export default function Home() {
           </div>
         )}
 
-        {/* 共有モーダル */}
-        {showShareModal && shareUrl && (
+        {/* 共有モーダル（常時表示可能） */}
+        {showShareModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-900">
-                  リンクを共有
+                  {shareUrl ? 'リンクを共有' : 'サービスを共有'}
                 </h3>
                 <button
                   onClick={() => setShowShareModal(false)}
@@ -756,7 +781,7 @@ export default function Home() {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    value={`${shareUrl}?ref=share10`}
+                    value={shareUrl ? `${shareUrl}?ref=share10` : typeof window !== 'undefined' ? `${window.location.origin}?ref=share10` : ''}
                     readOnly
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm"
                   />
@@ -768,13 +793,19 @@ export default function Home() {
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-gray-500">
-                  このリンクを共有すると、グループレポートの構造をチームメンバーと確認できます。共有してくれた方にPro 10%割引を適用します。
+                  {shareUrl 
+                    ? 'このリンクを共有すると、グループレポートの構造をチームメンバーと確認できます。共有してくれた方にPro 10%割引を適用します。'
+                    : 'AXONのトップページを共有します。共有してくれた方にPro 10%割引を適用します。'
+                  }
                 </p>
               </div>
 
               {/* SNSシェアボタン */}
               <div>
-                <ShareButtons shareUrl={shareUrl} />
+                <ShareButtons 
+                  shareUrl={shareUrl || (typeof window !== 'undefined' ? window.location.origin : '')}
+                  {...(shareUrl ? {} : { description: 'AXON（文系レポ助）は、文系レポートの構造設計を支援するツールです。書けないを、構造で解決します。無料で5回まで利用可能。' })}
+                />
               </div>
             </div>
           </div>
