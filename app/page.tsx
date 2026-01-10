@@ -108,10 +108,23 @@ async function generateOutline(
           points,
         };
       } catch (error) {
-        console.error(`Error generating points for ${section.title}:`, error);
+        // エラーメッセージでエラータイプを区別
+        const errorMessage = error instanceof Error ? error.message : '不明なエラー';
+        console.error(`Error generating points for ${section.title}:`, errorMessage);
+        
+        // エラーメッセージに応じたログ出力
+        if (errorMessage === 'APIキー未設定') {
+          console.error('[Frontend] APIキー未設定エラー');
+        } else if (errorMessage === 'API呼び出し失敗') {
+          console.error('[Frontend] API呼び出し失敗エラー');
+        } else if (errorMessage === 'レスポンス形式不正') {
+          console.error('[Frontend] レスポンス形式不正エラー');
+        }
+        
+        // API失敗時でも section.title は表示したまま（points は空配列）
         return {
           ...section,
-          points: ['論点の生成に失敗しました。再度お試しください。'],
+          points: [], // 空配列にして、タイトルだけ表示されるようにする
         };
       }
     })
@@ -258,14 +271,20 @@ export default function Home() {
                   <h3 className="text-xl font-semibold text-gray-800 mb-3">
                     {section.title}
                   </h3>
-                  <ul className="space-y-2">
-                    {section.points.map((point, pointIndex) => (
-                      <li key={pointIndex} className="text-gray-700 flex items-start">
-                        <span className="text-blue-500 mr-2">•</span>
-                        <span>{point}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  {section.points.length > 0 ? (
+                    <ul className="space-y-2">
+                      {section.points.map((point, pointIndex) => (
+                        <li key={pointIndex} className="text-gray-700 flex items-start">
+                          <span className="text-blue-500 mr-2">•</span>
+                          <span>{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-gray-500 text-sm italic">
+                      論点の生成に失敗しました。再度お試しください。
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

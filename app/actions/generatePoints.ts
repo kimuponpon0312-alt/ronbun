@@ -5,6 +5,28 @@ import OpenAI from 'openai';
 type Field = '法学' | '経済学' | '文学' | '社会学';
 type InstructorType = '厳格型' | '実務重視型' | '理論重視型' | '柔軟型';
 
+// エラータイプを定義
+class APIKeyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'APIKeyError';
+  }
+}
+
+class APICallError extends Error {
+  constructor(message: string, public originalError?: unknown) {
+    super(message);
+    this.name = 'APICallError';
+  }
+}
+
+class ResponseFormatError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ResponseFormatError';
+  }
+}
+
 export async function generatePoints(
   field: Field,
   question: string,
@@ -12,11 +34,19 @@ export async function generatePoints(
   sectionTitle: string,
   instructorType: InstructorType
 ): Promise<string[]> {
+  // APIキーのチェックとログ（boolean形式）
   const apiKey = process.env.OPENAI_API_KEY;
+  console.log('[generatePoints] process.env.OPENAI_API_KEY (boolean):', !!apiKey);
+  console.log('[generatePoints] process.env.OPENAI_API_KEY is undefined:', apiKey === undefined);
+  
   if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not set');
+    console.error('[generatePoints] OPENAI_API_KEY is not set');
+    throw new APIKeyError('APIキー未設定');
   }
 
+  // OpenAI SDK v6.16.0 を使用
+  // モデル: gpt-4o-mini (最新の推奨モデル)
+  // API: chat.completions.create (Chat Completions API)
   const openai = new OpenAI({
     apiKey: apiKey,
   });
@@ -52,6 +82,11 @@ export async function generatePoints(
 各論点を改行で区切ったテキストとして返してください。`;
 
   try {
+    console.error('[generatePoints] OpenAI API呼び出し前 - セクション:', sectionTitle);
+    console.error('[generatePoints] 使用SDK: openai (npm) v6.16.0');
+    console.error('[generatePoints] 使用モデル: gpt-4o-mini');
+    console.error('[generatePoints] API: chat.completions.create');
+    
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -68,8 +103,29 @@ export async function generatePoints(
       max_tokens: 500,
     });
 
-    const content = response.choices[0]?.message?.content || '';
+    console.error('[generatePoints] OpenAI API呼び出し後 - セクション:', sectionTitle);
+
+    // レスポンス形式の検証
+    if (!response || !response.choices || response.choices.length === 0) {
+      console.error('[generatePoints] レスポンス形式不正 - choices が存在しないか空');
+      console.error('[generatePoints] response:', JSON.stringify(response, null, 2));
+      throw new ResponseFormatError('レスポンス形式不正');
+    }
+
+    const firstChoice = response.choices[0];
+    if (!firstChoice || !firstChoice.message) {
+      console.error('[generatePoints] レスポンス形式不正 - message が存在しない');
+      console.error('[generatePoints] firstChoice:', JSON.stringify(firstChoice, null, 2));
+      throw new ResponseFormatError('レスポンス形式不正');
+    }
+
+    const content = firstChoice.message.content;
     
+    if (content === null || content === undefined) {
+      console.error('[generatePoints] レスポンス形式不正 - content が null または undefined');
+      throw new ResponseFormatError('レスポンス形式不正');
+    }
+
     // 改行で分割し、空行や記号を除去
     const points = content
       .split('\n')
@@ -87,9 +143,35 @@ export async function generatePoints(
       .map((line) => line.replace(/^[-\*•]\s*/, '').trim()) // 箇条書き記号を除去
       .filter((line) => line.length > 0);
 
-    return points.length > 0 ? points : ['論点の生成に失敗しました'];
-  } catch (error) {
-    console.error('OpenAI API Error:', error);
-    throw new Error('論点の生成に失敗しました');
+    if (points.length === 0) {
+      console.error('[generatePoints] レスポンス形式不正 - パース後の論点が空');
+      throw new ResponseFormatError('レスポンス形式不正');
+    }
+
+    return points;
+  } catch (error: unknown) {
+    console.error('[generatePoints] OpenAI API Error - セクション:', sectionTitle);
+    
+    // 既にカスタムエラーの場合は再スロー
+    if (error instanceof APIKeyError || error instanceof ResponseFormatError) {
+      console.error('[generatePoints] error.name:', error.name);
+      console.error('[generatePoints] error.message:', error.message);
+      throw error;
+    }
+    
+    // API呼び出しエラー
+    if (error instanceof OpenAI.APIError) {
+      console.error('[generatePoints] OpenAI.APIError 発生');
+      console.error('[generatePoints] error.message:', error.message);
+      console.error('[generatePoints] error.status:', error.status);
+      console.error('[generatePoints] error.response:', error.response);
+      throw new APICallError('API呼び出し失敗', error);
+    }
+    
+    // その他のエラー
+    console.error('[generatePoints] error.message:', error instanceof Error ? error.message : 'N/A');
+    console.error('[generatePoints] error.response:', (error as any)?.response || 'N/A');
+    console.error('[generatePoints] full error:', error);
+    throw new APICallError('API呼び出し失敗', error);
   }
 }
