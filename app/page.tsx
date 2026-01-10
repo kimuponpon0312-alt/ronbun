@@ -4,168 +4,98 @@ import { useState } from 'react';
 
 type Field = '法学' | '経済学' | '文学' | '社会学';
 
-interface OutlineSection {
+type Section = {
   title: string;
   points: string[];
-}
+};
 
-interface ReportOutline {
-  sections: OutlineSection[];
-}
+type ReportOutline = {
+  sections: Section[];
+};
 
-// ダミーデータ生成関数
+const outlineGenerators: Record<Field, (length: number) => Section[]> = {
+  法学: (length) => [
+    {
+      title: '序論',
+      points: ['問題提起', '研究目的'],
+    },
+    {
+      title: '本論',
+      points: [
+        '関連法規の整理',
+        '判例・学説の検討',
+        ...(length > 5000 ? ['評価・批判'] : []),
+      ],
+    },
+    {
+      title: '結論',
+      points: ['結論の整理', '残された課題'],
+    },
+  ],
+
+  経済学: (length) => [
+    {
+      title: '序論',
+      points: ['テーマ設定', '分析視角'],
+    },
+    {
+      title: '本論',
+      points: [
+        '理論モデルの説明',
+        'データ・事例分析',
+        ...(length > 5000 ? ['政策的含意'] : []),
+      ],
+    },
+    {
+      title: '結論',
+      points: ['分析結果の要約', '今後の課題'],
+    },
+  ],
+
+  文学: (length) => [
+    {
+      title: '序論',
+      points: ['作品・作者紹介', '問題意識'],
+    },
+    {
+      title: '本論',
+      points: [
+        '表現・構成の分析',
+        '主題の考察',
+        ...(length > 5000 ? ['他作品との比較'] : []),
+      ],
+    },
+    {
+      title: '結論',
+      points: ['解釈のまとめ', '文学的意義'],
+    },
+  ],
+
+  社会学: (length) => [
+    {
+      title: '序論',
+      points: ['社会的背景', '研究課題'],
+    },
+    {
+      title: '本論',
+      points: [
+        '先行研究の整理',
+        '社会構造の分析',
+        ...(length > 5000 ? ['制度的含意'] : []),
+      ],
+    },
+    {
+      title: '結論',
+      points: ['考察のまとめ', '残された課題'],
+    },
+  ],
+};
+
 function generateDummyOutline(field: Field, wordCount: number): ReportOutline {
-  const baseSections: Record<Field, () => OutlineSection[]> = {
-    法学: () => [
-      {
-        title: 'はじめに',
-        points: [
-          '問題提起：法律問題の背景と重要性',
-          '本レポートの目的と構成の提示',
-          '検討範囲の限定',
-        ],
-      },
-      {
-        title: '現行法制度の検討',
-        points: [
-          '関連する法律条文の解釈',
-          '判例の整理と分析',
-          '学説の対立点の整理',
-        ],
-      },
-      {
-        title: '問題点の指摘',
-        points: [
-          '現行制度における課題の明確化',
-          '実務上の問題点',
-          '理論上の矛盾点',
-        ],
-      },
-      {
-        title: '結論',
-        points: [
-          '検討結果の総括',
-          '今後の展望',
-        ],
-      },
-    ],
-    経済学: () => [
-      {
-        title: '序論',
-        points: [
-          '研究背景と動機',
-          '問題意識の明確化',
-          '分析の枠組みの提示',
-        ],
-      },
-      {
-        title: '理論的考察',
-        points: [
-          '関連する経済理論の整理',
-          '先行研究のレビュー',
-          '理論モデルの提示',
-        ],
-      },
-      {
-        title: '実証分析',
-        points: [
-          'データの説明',
-          '分析手法の説明',
-          '結果の提示と解釈',
-        ],
-      },
-      {
-        title: '結論',
-        points: [
-          '分析結果の要約',
-          '政策的含意',
-          '今後の研究課題',
-        ],
-      },
-    ],
-    文学: () => [
-      {
-        title: 'はじめに',
-        points: [
-          '作品の背景と執筆動機',
-          '先行研究の整理',
-          '本論の視点の提示',
-        ],
-      },
-      {
-        title: 'テーマの分析',
-        points: [
-          '主要テーマの抽出と考察',
-          '作品構造の分析',
-          '言語表現の特徴',
-        ],
-      },
-      {
-        title: '作品の意義',
-        points: [
-          '当時の社会背景との関係',
-          '後世への影響',
-          '現代における意義',
-        ],
-      },
-      {
-        title: 'おわりに',
-        points: [
-          '分析の総括',
-          '残された課題',
-        ],
-      ],
-    ],
-    社会学: () => [
-      {
-        title: '序論',
-        points: [
-          '研究の背景と問題意識',
-          '研究目的と意義',
-          '分析の枠組み',
-        ],
-      },
-      {
-        title: '理論的視座',
-        points: [
-          '関連する社会理論の整理',
-          '先行研究のレビュー',
-          '分析概念の明確化',
-        ],
-      },
-      {
-        title: '実証的検討',
-        points: [
-          '調査方法の説明',
-          'データの分析',
-          '結果の解釈',
-        ],
-      },
-      {
-        title: '結論',
-        points: [
-          '知見の総括',
-          '理論的含意',
-          '今後の研究への示唆',
-        ],
-      ],
-    ],
-  };
+  const sections = outlineGenerators[field](wordCount);
 
-  const sections = baseSections[field]();
-  
-  // 字数に応じてセクション数を調整（簡単な調整）
   if (wordCount < 2000) {
-    // 短い場合はセクションを減らす
-    return { sections: sections.slice(0, 3) };
-  } else if (wordCount > 5000) {
-    // 長い場合は各セクションの論点を増やす
-    return {
-      sections: sections.map((section, index) => ({
-        ...section,
-        points: [...section.points, `追加の論点${index + 1}`],
-      })),
-    };
+    return { sections: sections.slice(0, 2) };
   }
 
   return { sections };
