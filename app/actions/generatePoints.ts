@@ -2,8 +2,85 @@
 
 import OpenAI from 'openai';
 
-type Field = '法学' | '経済学' | '文学' | '社会学';
-type InstructorType = '厳格型' | '実務重視型' | '理論重視型' | '柔軟型';
+export type Field = '法学' | '経済学' | '文学' | '社会学';
+export type InstructorType = '厳格型' | '実務重視型' | '理論重視型' | '柔軟型';
+
+export type GeneratePointsResult = {
+  points: string[];
+  isFallback: boolean;
+};
+
+// フォールバック論点テンプレート（分野 × セクション）
+const fallbackPoints: Record<Field, Record<string, string[]>> = {
+  法学: {
+    序論: [
+      '問題提起と研究背景の明確化',
+      '研究の目的と意義の提示',
+      '検討範囲の限定とアプローチ方法の説明',
+    ],
+    本論: [
+      '関連する法規・条項の整理と解釈',
+      '判例の整理と分析',
+      '学説の対立点と主要な論点の整理',
+      '現行制度における問題点の指摘',
+    ],
+    結論: [
+      '検討結果の総括',
+      '今後の課題と展望の提示',
+    ],
+  },
+  経済学: {
+    序論: [
+      '研究テーマの設定と背景の説明',
+      '問題意識と研究目的の明確化',
+      '分析の視角とフレームワークの提示',
+    ],
+    本論: [
+      '理論モデルの説明と先行研究の整理',
+      'データの説明と分析手法の提示',
+      '実証分析の結果と解釈',
+      '政策的含意の検討',
+    ],
+    結論: [
+      '分析結果の要約と主要な知見',
+      '今後の研究課題と限界の提示',
+    ],
+  },
+  文学: {
+    序論: [
+      '作品・作者の紹介と時代背景',
+      '問題意識と先行研究の整理',
+      '本論で検討する視点の提示',
+    ],
+    本論: [
+      '作品の構造・表現技法の分析',
+      '主要テーマの抽出と考察',
+      '他作品との比較分析',
+      '作品の意義と価値の考察',
+    ],
+    結論: [
+      '分析結果の総括と解釈のまとめ',
+      '作品の文学的意義の提示',
+    ],
+  },
+  社会学: {
+    序論: [
+      '社会的背景と問題の所在',
+      '研究課題の設定と研究目的',
+      '分析の枠組みと調査方法の説明',
+    ],
+    本論: [
+      '先行研究の整理と理論的視座の明確化',
+      '社会構造の分析とデータの解釈',
+      '社会現象の意味づけと考察',
+      '制度的含意の検討',
+    ],
+    結論: [
+      '考察のまとめと主要な知見',
+      '残された課題と今後の研究への示唆',
+    ],
+  },
+};
 
 // エラータイプを定義
 class APIKeyError extends Error {
@@ -27,21 +104,32 @@ class ResponseFormatError extends Error {
   }
 }
 
+// フォールバック論点を取得する関数
+function getFallbackPoints(field: Field, sectionTitle: string): string[] {
+  const fieldFallbacks = fallbackPoints[field];
+  const points = fieldFallbacks[sectionTitle] || fieldFallbacks['本論'] || [];
+  console.log(`[generatePoints] フォールバック論点を使用 - 分野: ${field}, セクション: ${sectionTitle}`);
+  return points;
+}
+
 export async function generatePoints(
   field: Field,
   question: string,
   wordCount: number,
   sectionTitle: string,
   instructorType: InstructorType
-): Promise<string[]> {
+): Promise<GeneratePointsResult> {
   // APIキーのチェックとログ（boolean形式）
   const apiKey = process.env.OPENAI_API_KEY;
   console.log('[generatePoints] process.env.OPENAI_API_KEY (boolean):', !!apiKey);
   console.log('[generatePoints] process.env.OPENAI_API_KEY is undefined:', apiKey === undefined);
   
   if (!apiKey) {
-    console.error('[generatePoints] OPENAI_API_KEY is not set');
-    throw new APIKeyError('APIキー未設定');
+    console.error('[generatePoints] OPENAI_API_KEY is not set - フォールバック論点を返します');
+    return {
+      points: getFallbackPoints(field, sectionTitle),
+      isFallback: true,
+    };
   }
 
   // OpenAI SDK v6.16.0 を使用
@@ -107,23 +195,32 @@ export async function generatePoints(
 
     // レスポンス形式の検証
     if (!response || !response.choices || response.choices.length === 0) {
-      console.error('[generatePoints] レスポンス形式不正 - choices が存在しないか空');
+      console.error('[generatePoints] レスポンス形式不正 - choices が存在しないか空 - フォールバック論点を返します');
       console.error('[generatePoints] response:', JSON.stringify(response, null, 2));
-      throw new ResponseFormatError('レスポンス形式不正');
+      return {
+        points: getFallbackPoints(field, sectionTitle),
+        isFallback: true,
+      };
     }
 
     const firstChoice = response.choices[0];
     if (!firstChoice || !firstChoice.message) {
-      console.error('[generatePoints] レスポンス形式不正 - message が存在しない');
+      console.error('[generatePoints] レスポンス形式不正 - message が存在しない - フォールバック論点を返します');
       console.error('[generatePoints] firstChoice:', JSON.stringify(firstChoice, null, 2));
-      throw new ResponseFormatError('レスポンス形式不正');
+      return {
+        points: getFallbackPoints(field, sectionTitle),
+        isFallback: true,
+      };
     }
 
     const content = firstChoice.message.content;
     
     if (content === null || content === undefined) {
-      console.error('[generatePoints] レスポンス形式不正 - content が null または undefined');
-      throw new ResponseFormatError('レスポンス形式不正');
+      console.error('[generatePoints] レスポンス形式不正 - content が null または undefined - フォールバック論点を返します');
+      return {
+        points: getFallbackPoints(field, sectionTitle),
+        isFallback: true,
+      };
     }
 
     // 改行で分割し、空行や記号を除去
@@ -144,34 +241,40 @@ export async function generatePoints(
       .filter((line) => line.length > 0);
 
     if (points.length === 0) {
-      console.error('[generatePoints] レスポンス形式不正 - パース後の論点が空');
-      throw new ResponseFormatError('レスポンス形式不正');
+      console.error('[generatePoints] レスポンス形式不正 - パース後の論点が空 - フォールバック論点を返します');
+      return {
+        points: getFallbackPoints(field, sectionTitle),
+        isFallback: true,
+      };
     }
 
-    return points;
+    return {
+      points,
+      isFallback: false,
+    };
   } catch (error: unknown) {
     console.error('[generatePoints] OpenAI API Error - セクション:', sectionTitle);
     
-    // 既にカスタムエラーの場合は再スロー
-    if (error instanceof APIKeyError || error instanceof ResponseFormatError) {
-      console.error('[generatePoints] error.name:', error.name);
-      console.error('[generatePoints] error.message:', error.message);
-      throw error;
-    }
-    
     // API呼び出しエラー
     if (error instanceof OpenAI.APIError) {
-      console.error('[generatePoints] OpenAI.APIError 発生');
+      console.error('[generatePoints] OpenAI.APIError 発生 - フォールバック論点を返します');
       console.error('[generatePoints] error.message:', error.message);
       console.error('[generatePoints] error.status:', error.status);
       console.error('[generatePoints] error.response:', error.response);
-      throw new APICallError('API呼び出し失敗', error);
+      return {
+        points: getFallbackPoints(field, sectionTitle),
+        isFallback: true,
+      };
     }
     
     // その他のエラー
+    console.error('[generatePoints] 予期しないエラー - フォールバック論点を返します');
     console.error('[generatePoints] error.message:', error instanceof Error ? error.message : 'N/A');
     console.error('[generatePoints] error.response:', (error as any)?.response || 'N/A');
     console.error('[generatePoints] full error:', error);
-    throw new APICallError('API呼び出し失敗', error);
+    return {
+      points: getFallbackPoints(field, sectionTitle),
+      isFallback: true,
+    };
   }
 }

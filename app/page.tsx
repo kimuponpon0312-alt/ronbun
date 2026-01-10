@@ -2,6 +2,11 @@
 
 import { useState } from 'react';
 import { generatePoints } from './actions/generatePoints';
+
+type GeneratePointsResult = {
+  points: string[];
+  isFallback: boolean;
+};
 import { saveStatistics } from './actions/saveStatistics';
 
 type Field = '法学' | '経済学' | '文学' | '社会学';
@@ -10,10 +15,12 @@ type InstructorType = '厳格型' | '実務重視型' | '理論重視型' | '柔
 type Section = {
   title: string;
   points: string[];
+  isFallback?: boolean;
 };
 
 type ReportOutline = {
   sections: Section[];
+  hasFallback?: boolean; // フォールバックが使用されたかどうか
 };
 
 // セクション構成を定義（タイトルのみ、論点はAIで生成）
@@ -92,45 +99,31 @@ async function generateOutline(
     sections = sections.slice(0, 2);
   }
 
-  // 各セクションの論点をAIで生成
+  // 各セクションの論点をAIで生成（フォールバック対応）
   const sectionsWithPoints = await Promise.all(
-    sections.map(async (section) => {
-      try {
-        const points = await generatePoints(
-          field,
-          question,
-          wordCount,
-          section.title,
-          instructorType
-        );
-        return {
-          ...section,
-          points,
-        };
-      } catch (error) {
-        // エラーメッセージでエラータイプを区別
-        const errorMessage = error instanceof Error ? error.message : '不明なエラー';
-        console.error(`Error generating points for ${section.title}:`, errorMessage);
-        
-        // エラーメッセージに応じたログ出力
-        if (errorMessage === 'APIキー未設定') {
-          console.error('[Frontend] APIキー未設定エラー');
-        } else if (errorMessage === 'API呼び出し失敗') {
-          console.error('[Frontend] API呼び出し失敗エラー');
-        } else if (errorMessage === 'レスポンス形式不正') {
-          console.error('[Frontend] レスポンス形式不正エラー');
-        }
-        
-        // API失敗時でも section.title は表示したまま（points は空配列）
-        return {
-          ...section,
-          points: [], // 空配列にして、タイトルだけ表示されるようにする
-        };
-      }
+    sections.map(async (section): Promise<Section> => {
+      const result = (await generatePoints(
+        field,
+        question,
+        wordCount,
+        section.title,
+        instructorType
+      )) as unknown as { points: string[]; isFallback: boolean };
+      return {
+        ...section,
+        points: result.points,
+        isFallback: result.isFallback,
+      };
     })
   );
 
-  return { sections: sectionsWithPoints };
+  // フォールバックが使用されたかどうかを判定
+  const hasFallback = sectionsWithPoints.some((section) => section.isFallback);
+
+  return {
+    sections: sectionsWithPoints,
+    hasFallback,
+  };
 }
 
 export default function Home() {
@@ -264,7 +257,21 @@ export default function Home() {
 
         {outline && (
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">レポート構成</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">レポート構成</h2>
+              {outline.hasFallback && (
+                <span className="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                  暫定構成を表示しています
+                </span>
+              )}
+            </div>
+            {outline.hasFallback && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                <p className="text-sm text-amber-800">
+                  AI生成に失敗したため、暫定構成を表示しています。論点は学術レポートで頻出するパターンに基づいています。
+                </p>
+              </div>
+            )}
             <div className="space-y-6">
               {outline.sections.map((section, index) => (
                 <div key={index} className="border-l-4 border-blue-500 pl-4">
@@ -282,7 +289,7 @@ export default function Home() {
                     </ul>
                   ) : (
                     <p className="text-gray-500 text-sm italic">
-                      論点の生成に失敗しました。再度お試しください。
+                      論点が生成されませんでした。
                     </p>
                   )}
                 </div>
