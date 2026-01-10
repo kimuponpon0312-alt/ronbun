@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { generatePoints } from './actions/generatePoints';
 import { saveStatistics } from './actions/saveStatistics';
 
@@ -298,9 +299,17 @@ export default function Home() {
           </div>
         </div>
 
-        <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">
-          文系レポート構成ジェネレーター
-        </h1>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            文系レポート構成ジェネレーター
+          </h1>
+          <Link
+            href="/pricing"
+            className="text-purple-600 hover:text-purple-700 font-medium text-sm"
+          >
+            料金プラン →
+          </Link>
+        </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6 mb-8">
           <div className="space-y-6">
