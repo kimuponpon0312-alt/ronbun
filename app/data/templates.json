@@ -1,0 +1,347 @@
+{
+  "literature": {
+    "coreQuestion": "解釈の妥当性をどのように検証・主張するか",
+    "intro": [
+      {
+        "text": "作品の歴史的・文化的文脈の整理",
+        "weight_theory": 9,
+        "weight_practical": 5
+      },
+      {
+        "text": "先行研究における解釈の対立点の明確化",
+        "weight_theory": 10,
+        "weight_practical": 6
+      },
+      {
+        "text": "本論で検討する解釈アプローチの提示",
+        "weight_theory": 8,
+        "weight_practical": 9
+      },
+      {
+        "text": "解釈の妥当性を判断する基準の設定",
+        "weight_theory": 9,
+        "weight_practical": 7
+      }
+    ],
+    "body": [
+      {
+        "text": "テクストの構造分析と解釈の根拠提示",
+        "weight_theory": 10,
+        "weight_practical": 7
+      },
+      {
+        "text": "表現技法と意味生成の関係性の考察",
+        "weight_theory": 9,
+        "weight_practical": 6
+      },
+      {
+        "text": "同時代作品との比較による解釈の妥当性検証",
+        "weight_theory": 8,
+        "weight_practical": 8
+      },
+      {
+        "text": "複数の解釈可能性の検討と選択理由",
+        "weight_theory": 10,
+        "weight_practical": 7
+      },
+      {
+        "text": "解釈の限界と前提条件の明確化",
+        "weight_theory": 9,
+        "weight_practical": 5
+      }
+    ],
+    "conclusion": [
+      {
+        "text": "提示した解釈の妥当性の総合評価",
+        "weight_theory": 10,
+        "weight_practical": 8
+      },
+      {
+        "text": "解釈アプローチの学術的意義の提示",
+        "weight_theory": 9,
+        "weight_practical": 6
+      },
+      {
+        "text": "今後の解釈研究への示唆",
+        "weight_theory": 7,
+        "weight_practical": 5
+      }
+    ]
+  },
+  "law": {
+    "coreQuestion": "どのように法的に処理すべきか",
+    "intro": [
+      {
+        "text": "問題事案の事実関係の整理",
+        "weight_theory": 6,
+        "weight_practical": 10
+      },
+      {
+        "text": "適用されるべき法規範の特定",
+        "weight_theory": 8,
+        "weight_practical": 10
+      },
+      {
+        "text": "規範適用プロセスの分析視角の提示",
+        "weight_theory": 10,
+        "weight_practical": 7
+      },
+      {
+        "text": "検討すべき法的論点の明確化",
+        "weight_theory": 9,
+        "weight_practical": 9
+      }
+    ],
+    "body": [
+      {
+        "text": "法規範の解釈と適用可能性の検討",
+        "weight_theory": 10,
+        "weight_practical": 9
+      },
+      {
+        "text": "判例の整理と規範適用のパターン分析",
+        "weight_theory": 8,
+        "weight_practical": 10
+      },
+      {
+        "text": "学説の対立点と理論的根拠の検討",
+        "weight_theory": 10,
+        "weight_practical": 6
+      },
+      {
+        "text": "具体的事案への規範適用プロセスの構築",
+        "weight_theory": 7,
+        "weight_practical": 10
+      },
+      {
+        "text": "規範適用における政策判断の位置づけ",
+        "weight_theory": 9,
+        "weight_practical": 7
+      }
+    ],
+    "conclusion": [
+      {
+        "text": "規範適用プロセスの妥当性評価",
+        "weight_theory": 10,
+        "weight_practical": 9
+      },
+      {
+        "text": "法的判断の根拠と結論の提示",
+        "weight_theory": 8,
+        "weight_practical": 10
+      },
+      {
+        "text": "規範適用の一般化可能性と限界",
+        "weight_theory": 9,
+        "weight_practical": 6
+      }
+    ]
+  },
+  "philosophy": {
+    "coreQuestion": "概念操作と反論処理をどのように構造化するか",
+    "intro": [
+      {
+        "text": "問題となる概念の定義と明確化",
+        "weight_theory": 10,
+        "weight_practical": 7
+      },
+      {
+        "text": "概念操作の理論的文脈の整理",
+        "weight_theory": 10,
+        "weight_practical": 5
+      },
+      {
+        "text": "検討すべき反論の種類と構造の提示",
+        "weight_theory": 9,
+        "weight_practical": 8
+      },
+      {
+        "text": "概念操作と反論処理の分析枠組み",
+        "weight_theory": 10,
+        "weight_practical": 6
+      }
+    ],
+    "body": [
+      {
+        "text": "概念の内包的・外延的定義の操作",
+        "weight_theory": 10,
+        "weight_practical": 6
+      },
+      {
+        "text": "概念間の論理的関係性の構造化",
+        "weight_theory": 10,
+        "weight_practical": 5
+      },
+      {
+        "text": "想定される反論の整理と類型化",
+        "weight_theory": 8,
+        "weight_practical": 9
+      },
+      {
+        "text": "反論に対する論理的応答の設計",
+        "weight_theory": 9,
+        "weight_practical": 8
+      },
+      {
+        "text": "概念操作の妥当性と限界の検討",
+        "weight_theory": 10,
+        "weight_practical": 6
+      }
+    ],
+    "conclusion": [
+      {
+        "text": "概念操作の総合的評価と正当化",
+        "weight_theory": 10,
+        "weight_practical": 7
+      },
+      {
+        "text": "反論処理の論理的完結性の提示",
+        "weight_theory": 10,
+        "weight_practical": 8
+      },
+      {
+        "text": "概念操作の哲学的意義と今後の課題",
+        "weight_theory": 9,
+        "weight_practical": 5
+      }
+    ]
+  },
+  "sociology": {
+    "coreQuestion": "社会現象を説明するモデルをどのように構築するか",
+    "intro": [
+      {
+        "text": "対象とする社会現象の明確化",
+        "weight_theory": 7,
+        "weight_practical": 9
+      },
+      {
+        "text": "説明モデルの理論的枠組みの提示",
+        "weight_theory": 10,
+        "weight_practical": 6
+      },
+      {
+        "text": "先行研究における説明モデルの整理",
+        "weight_theory": 9,
+        "weight_practical": 7
+      },
+      {
+        "text": "本論で構築する説明モデルの設計方針",
+        "weight_theory": 10,
+        "weight_practical": 8
+      }
+    ],
+    "body": [
+      {
+        "text": "説明変数の特定と理論的根拠",
+        "weight_theory": 10,
+        "weight_practical": 7
+      },
+      {
+        "text": "社会構造の分析と説明モデルへの組み込み",
+        "weight_theory": 9,
+        "weight_practical": 8
+      },
+      {
+        "text": "データの解釈と説明モデルの検証",
+        "weight_theory": 8,
+        "weight_practical": 10
+      },
+      {
+        "text": "説明モデルの因果メカニズムの明確化",
+        "weight_theory": 10,
+        "weight_practical": 7
+      },
+      {
+        "text": "説明モデルの適用範囲と限界",
+        "weight_theory": 9,
+        "weight_practical": 6
+      }
+    ],
+    "conclusion": [
+      {
+        "text": "提示した説明モデルの妥当性評価",
+        "weight_theory": 10,
+        "weight_practical": 8
+      },
+      {
+        "text": "説明モデルの社会学的意義の提示",
+        "weight_theory": 9,
+        "weight_practical": 6
+      },
+      {
+        "text": "説明モデルの一般化可能性と今後の課題",
+        "weight_theory": 8,
+        "weight_practical": 7
+      }
+    ]
+  },
+  "history": {
+    "coreQuestion": "史料解釈の枠組みをどのように設計するか",
+    "intro": [
+      {
+        "text": "研究対象の時代的・地理的範囲の設定",
+        "weight_theory": 7,
+        "weight_practical": 9
+      },
+      {
+        "text": "史料解釈の理論的枠組みの提示",
+        "weight_theory": 10,
+        "weight_practical": 6
+      },
+      {
+        "text": "先行研究における史料解釈の対立点",
+        "weight_theory": 9,
+        "weight_practical": 7
+      },
+      {
+        "text": "本論で適用する史料解釈の枠組みの設計",
+        "weight_theory": 10,
+        "weight_practical": 8
+      }
+    ],
+    "body": [
+      {
+        "text": "史料的証拠の整理と史料批判",
+        "weight_theory": 8,
+        "weight_practical": 10
+      },
+      {
+        "text": "史料解釈の方法論的基盤の明確化",
+        "weight_theory": 10,
+        "weight_practical": 6
+      },
+      {
+        "text": "複数史料の相互検証と解釈の統合",
+        "weight_theory": 9,
+        "weight_practical": 9
+      },
+      {
+        "text": "史料解釈の歴史的文脈への位置づけ",
+        "weight_theory": 10,
+        "weight_practical": 7
+      },
+      {
+        "text": "史料解釈の限界と不確定性の明確化",
+        "weight_theory": 9,
+        "weight_practical": 5
+      }
+    ],
+    "conclusion": [
+      {
+        "text": "史料解釈の枠組みの妥当性評価",
+        "weight_theory": 10,
+        "weight_practical": 8
+      },
+      {
+        "text": "提示した史料解釈の歴史的意義",
+        "weight_theory": 9,
+        "weight_practical": 7
+      },
+      {
+        "text": "史料解釈の枠組みの適用可能性と課題",
+        "weight_theory": 8,
+        "weight_practical": 6
+      }
+    ]
+  }
+}

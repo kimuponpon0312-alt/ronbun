@@ -5,14 +5,28 @@ import Link from 'next/link';
 import { generatePoints } from './actions/generatePoints';
 import { saveStatistics } from './actions/saveStatistics';
 
-type GeneratePointsResult = {
-  points: string[];
-  isFallback: boolean;
+// 型定義（generatePoints.tsから直接インポートできない場合のフォールバック）
+type Field = 'literature' | 'law' | 'philosophy' | 'sociology' | 'history';
+type InstructorType = '理論重視型' | '実務重視型';
+type Plan = 'free' | 'pro';
+
+// 分野の表示名マッピング（内部は英語、表示は日本語）
+const FIELD_DISPLAY_NAMES: Record<Field, string> = {
+  literature: '文学',
+  law: '法学',
+  philosophy: '哲学',
+  sociology: '社会学',
+  history: '歴史学',
 };
 
-type Field = '法学' | '経済学' | '文学' | '社会学';
-type InstructorType = '厳格型' | '実務重視型' | '理論重視型' | '柔軟型';
-type Plan = 'free' | 'pro';
+// 分野の思想説明
+const FIELD_DESCRIPTIONS: Record<Field, string> = {
+  literature: '解釈の妥当性を設計する',
+  law: '規範適用プロセスを設計する',
+  philosophy: '概念操作と反論処理を設計する',
+  sociology: '説明モデルを設計する',
+  history: '史料解釈の枠組みを設計する',
+};
 
 type Section = {
   title: string;
@@ -22,81 +36,48 @@ type Section = {
 
 type ReportOutline = {
   sections: Section[];
-  hasFallback?: boolean; // フォールバックが使用されたかどうか
+  coreQuestion?: string; // 分野の問いの本質
 };
 
 // LocalStorage のキー
-const STORAGE_KEY_PLAN = 'report_generator_plan';
-const STORAGE_KEY_GENERATION_COUNT = 'report_generator_count';
-const STORAGE_KEY_LAST_GENERATION_DATE = 'report_generator_last_date';
+const STORAGE_KEY_PLAN = 'report_designer_plan';
+const STORAGE_KEY_DESIGN_COUNT = 'report_designer_count';
+const STORAGE_KEY_LAST_DESIGN_DATE = 'report_designer_last_date';
 
-// Freeプランの制限
+// Freeプランの制限（1日5回）
 const FREE_PLAN_LIMIT = 5;
 
-// セクション構成を定義（タイトルのみ、論点はAIで生成）
+// セクション構成を定義（タイトルのみ、論点はテンプレートから設計）
 const sectionTemplates: Record<Field, (length: number) => Section[]> = {
-  法学: (length) => [
-    {
-      title: '序論',
-      points: [], // AIで生成
-    },
-    {
-      title: '本論',
-      points: [], // AIで生成
-    },
-    {
-      title: '結論',
-      points: [], // AIで生成
-    },
+  literature: (length) => [
+    { title: '序論', points: [] },
+    { title: '本論', points: [] },
+    { title: '結論', points: [] },
   ],
-
-  経済学: (length) => [
-    {
-      title: '序論',
-      points: [], // AIで生成
-    },
-    {
-      title: '本論',
-      points: [], // AIで生成
-    },
-    {
-      title: '結論',
-      points: [], // AIで生成
-    },
+  law: (length) => [
+    { title: '序論', points: [] },
+    { title: '本論', points: [] },
+    { title: '結論', points: [] },
   ],
-
-  文学: (length) => [
-    {
-      title: '序論',
-      points: [], // AIで生成
-    },
-    {
-      title: '本論',
-      points: [], // AIで生成
-    },
-    {
-      title: '結論',
-      points: [], // AIで生成
-    },
+  philosophy: (length) => [
+    { title: '序論', points: [] },
+    { title: '本論', points: [] },
+    { title: '結論', points: [] },
   ],
-
-  社会学: (length) => [
-    {
-      title: '序論',
-      points: [], // AIで生成
-    },
-    {
-      title: '本論',
-      points: [], // AIで生成
-    },
-    {
-      title: '結論',
-      points: [], // AIで生成
-    },
+  sociology: (length) => [
+    { title: '序論', points: [] },
+    { title: '本論', points: [] },
+    { title: '結論', points: [] },
+  ],
+  history: (length) => [
+    { title: '序論', points: [] },
+    { title: '本論', points: [] },
+    { title: '結論', points: [] },
   ],
 };
 
-async function generateOutline(
+// レポート構成を設計する関数（テンプレートベース）
+async function designOutline(
   field: Field,
   question: string,
   wordCount: number,
@@ -109,47 +90,56 @@ async function generateOutline(
     sections = sections.slice(0, 2);
   }
 
-  // 各セクションの論点をAIで生成（フォールバック対応）
+  // 各セクションの論点をテンプレートベースで設計（重み付け済み）
+  let coreQuestion: string | undefined;
   const sectionsWithPoints = await Promise.all(
     sections.map(async (section): Promise<Section> => {
-      const result = (await generatePoints(
-        field,
-        question,
-        wordCount,
-        section.title,
-        instructorType
-      )) as unknown as { points: string[]; isFallback: boolean };
-      return {
-        ...section,
-        points: result.points,
-        isFallback: result.isFallback,
-      };
+      try {
+        const result = (await generatePoints(
+          field as Parameters<typeof generatePoints>[0],
+          question,
+          wordCount,
+          section.title,
+          instructorType as Parameters<typeof generatePoints>[4]
+        )) as unknown as { points: string[]; isFallback: boolean; coreQuestion?: string };
+        
+        if (result && result.coreQuestion) {
+          coreQuestion = result.coreQuestion;
+        }
+        return {
+          ...section,
+          points: result?.points || ['学術テンプレートの読み込み中'],
+        };
+      } catch (error) {
+        // エラーはログのみ、必ずテンプレートを返す
+        console.error(`[designOutline] セクション "${section.title}" の設計中にエラー:`, error);
+        return {
+          ...section,
+          points: ['学術テンプレートの読み込み中'],
+        };
+      }
     })
   );
 
-  // フォールバックが使用されたかどうかを判定
-  const hasFallback = sectionsWithPoints.some((section) => section.isFallback);
-
   return {
     sections: sectionsWithPoints,
-    hasFallback,
+    coreQuestion,
   };
 }
 
 export default function Home() {
-  const [field, setField] = useState<Field>('法学');
+  const [field, setField] = useState<Field>('law');
   const [question, setQuestion] = useState('');
   const [wordCount, setWordCount] = useState(3000);
   const [instructorType, setInstructorType] = useState<InstructorType>('理論重視型');
   const [outline, setOutline] = useState<ReportOutline | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan>('free');
-  const [generationCount, setGenerationCount] = useState(0);
+  const [designCount, setDesignCount] = useState(0); // 生成→設計に変更
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
 
-  // プランと生成回数の初期化
+  // プランと設計回数の初期化
   useEffect(() => {
     // プランをlocalStorageから読み込み
     const savedPlan = localStorage.getItem(STORAGE_KEY_PLAN) as Plan | null;
@@ -157,30 +147,23 @@ export default function Home() {
       setPlan(savedPlan);
     }
 
-    // 生成回数と日付をチェック
-    const lastDate = localStorage.getItem(STORAGE_KEY_LAST_GENERATION_DATE);
+    // 設計回数と日付をチェック
+    const lastDate = localStorage.getItem(STORAGE_KEY_LAST_DESIGN_DATE);
     const today = new Date().toISOString().split('T')[0];
 
     if (lastDate === today) {
       // 今日の日付なら回数を読み込み
-      const count = parseInt(localStorage.getItem(STORAGE_KEY_GENERATION_COUNT) || '0', 10);
-      setGenerationCount(count);
+      const count = parseInt(localStorage.getItem(STORAGE_KEY_DESIGN_COUNT) || '0', 10);
+      setDesignCount(count);
     } else {
       // 日付が変わっていたらリセット
-      setGenerationCount(0);
-      localStorage.setItem(STORAGE_KEY_GENERATION_COUNT, '0');
-      localStorage.setItem(STORAGE_KEY_LAST_GENERATION_DATE, today);
+      setDesignCount(0);
+      localStorage.setItem(STORAGE_KEY_DESIGN_COUNT, '0');
+      localStorage.setItem(STORAGE_KEY_LAST_DESIGN_DATE, today);
     }
   }, []);
 
-  // Freeプランの場合、指導教員タイプを固定
-  useEffect(() => {
-    if (plan === 'free') {
-      setInstructorType('理論重視型');
-    }
-  }, [plan]);
-
-  // Freeプランの場合、指導教員タイプを固定
+  // Freeプランの場合、指導教員タイプを固定（理論重視型のみ）
   useEffect(() => {
     if (plan === 'free') {
       setInstructorType('理論重視型');
@@ -193,64 +176,72 @@ export default function Home() {
     localStorage.setItem(STORAGE_KEY_PLAN, newPlan);
   };
 
-  // 生成回数を更新
-  const incrementGenerationCount = () => {
+  // 設計回数を更新
+  const incrementDesignCount = () => {
     const today = new Date().toISOString().split('T')[0];
-    const lastDate = localStorage.getItem(STORAGE_KEY_LAST_GENERATION_DATE);
+    const lastDate = localStorage.getItem(STORAGE_KEY_LAST_DESIGN_DATE);
     
     // 日付が変わっていたらリセット
     if (lastDate !== today) {
-      setGenerationCount(1);
-      localStorage.setItem(STORAGE_KEY_GENERATION_COUNT, '1');
-      localStorage.setItem(STORAGE_KEY_LAST_GENERATION_DATE, today);
+      setDesignCount(1);
+      localStorage.setItem(STORAGE_KEY_DESIGN_COUNT, '1');
+      localStorage.setItem(STORAGE_KEY_LAST_DESIGN_DATE, today);
     } else {
       // 同じ日ならカウントをインクリメント
-      const newCount = generationCount + 1;
-      setGenerationCount(newCount);
-      localStorage.setItem(STORAGE_KEY_GENERATION_COUNT, newCount.toString());
+      const newCount = designCount + 1;
+      setDesignCount(newCount);
+      localStorage.setItem(STORAGE_KEY_DESIGN_COUNT, newCount.toString());
     }
   };
 
-  // 生成可能かチェック
-  const canGenerate = (): boolean => {
+  // 設計可能かチェック
+  const canDesign = (): boolean => {
     if (plan === 'pro') {
       return true; // Proプランは無制限
     }
-    return generationCount < FREE_PLAN_LIMIT; // Freeプランは1日5回まで
+    return designCount < FREE_PLAN_LIMIT; // Freeプランは1日5回まで
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
 
     // Freeプランの制限チェック
-    if (!canGenerate()) {
+    if (!canDesign()) {
       setShowLimitModal(true);
       return;
     }
 
     setIsLoading(true);
 
-    try {
-      // 統計を保存（エラーが発生しても処理は継続）
-      await saveStatistics(field).catch((err) =>
-        console.error('Failed to save statistics:', err)
+      // 統計を保存（エラーはログのみ、処理は継続）
+      // 内部は英語、表示は日本語なのでマッピング不要（saveStatistics側で処理）
+      await saveStatistics(field as Parameters<typeof saveStatistics>[0]).catch((err) =>
+        console.error('[handleSubmit] 統計保存に失敗:', err)
       );
 
-      // アウトラインを生成
-      const generatedOutline = await generateOutline(
+    try {
+      // レポート構成を設計（テンプレートベース、必ず成功）
+      const designedOutline = await designOutline(
         field,
         question,
         wordCount,
         instructorType
       );
-      setOutline(generatedOutline);
+      setOutline(designedOutline);
 
-      // 生成回数をカウント
-      incrementGenerationCount();
+      // 設計回数をカウント
+      incrementDesignCount();
     } catch (err) {
-      setError('レポート構成の生成に失敗しました。再度お試しください。');
-      console.error('Error generating outline:', err);
+      // エラーはログのみ、必ずテンプレートを返すためUIにエラーは表示しない
+      console.error('[handleSubmit] 構成設計中にエラー:', err);
+      // フォールバックとして空の構成を設定（通常は到達しない）
+      setOutline({
+        sections: [
+          { title: '序論', points: ['学術テンプレートの読み込み中'] },
+          { title: '本論', points: ['学術テンプレートの読み込み中'] },
+          { title: '結論', points: ['学術テンプレートの読み込み中'] },
+        ],
+      });
     } finally {
       setIsLoading(false);
     }
@@ -289,7 +280,7 @@ export default function Home() {
             </div>
             {plan === 'free' && (
               <div className="text-sm text-gray-600">
-                本日の残り: {FREE_PLAN_LIMIT - generationCount}回
+                本日の残り: {FREE_PLAN_LIMIT - designCount}回
               </div>
             )}
             {plan === 'pro' && (
@@ -323,11 +314,15 @@ export default function Home() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 disabled={isLoading}
               >
-                <option value="法学">法学</option>
-                <option value="経済学">経済学</option>
-                <option value="文学">文学</option>
-                <option value="社会学">社会学</option>
+                <option value="literature">{FIELD_DISPLAY_NAMES.literature}</option>
+                <option value="law">{FIELD_DISPLAY_NAMES.law}</option>
+                <option value="philosophy">{FIELD_DISPLAY_NAMES.philosophy}</option>
+                <option value="sociology">{FIELD_DISPLAY_NAMES.sociology}</option>
+                <option value="history">{FIELD_DISPLAY_NAMES.history}</option>
               </select>
+              <p className="mt-1 text-xs text-gray-500 italic">
+                {FIELD_DESCRIPTIONS[field]}
+              </p>
             </div>
 
             <div>
@@ -365,7 +360,7 @@ export default function Home() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <label htmlFor="instructorType" className="block text-sm font-medium text-gray-700">
-                  指導教員タイプ
+                  指導教員タイプ（論点の重み付け）
                 </label>
                 {plan === 'free' && (
                   <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
@@ -380,46 +375,51 @@ export default function Home() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 disabled={isLoading || plan === 'free'}
               >
-                <option value="厳格型">厳格型 - 厳密な論理構成を重視</option>
-                <option value="実務重視型">実務重視型 - 実務的な観点を重視</option>
-                <option value="理論重視型">理論重視型 - 理論的フレームワークを重視</option>
-                <option value="柔軟型">柔軟型 - 創造的な視点を重視</option>
+                <option value="理論重視型">理論重視型 - 理論的フレームワークを重視する重み付け</option>
+                <option value="実務重視型">実務重視型 - 実務的な観点を重視する重み付け</option>
               </select>
               {plan === 'free' && (
                 <p className="mt-1 text-xs text-gray-500">
-                  Freeプランでは「理論重視型」のみ利用可能です
+                  Freeプランでは「理論重視型」の重み付けのみ利用可能です
                 </p>
               )}
+              <p className="mt-1 text-xs text-gray-500">
+                同じ構成項目でも、教員タイプに応じて表示順序と強調度が自動調整されます
+              </p>
             </div>
 
             <button
               type="submit"
-              disabled={isLoading || !canGenerate()}
+              disabled={isLoading || !canDesign()}
               className="w-full bg-blue-600 text-white py-3 px-4 rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {isLoading ? '生成中...' : canGenerate() ? '構成を生成' : '1日の制限に達しました'}
+              {isLoading ? '設計中...' : canDesign() ? '構造を提示する' : '1日の制限に達しました'}
             </button>
           </div>
         </form>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
-            {error}
-          </div>
-        )}
-
         {outline && (
           <div className="bg-white rounded-lg shadow-md p-6">
+            {/* 分野の問いの本質を表示 */}
+            {outline.coreQuestion && (
+              <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                <p className="text-sm font-semibold text-blue-900 mb-1">
+                  {FIELD_DISPLAY_NAMES[field]}の問いの本質:
+                </p>
+                <p className="text-sm text-blue-800 italic">
+                  {outline.coreQuestion}
+                </p>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">レポート構成</h2>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                {outline.hasFallback && (
-                  <span className="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
-                    暫定構成を表示しています
-                  </span>
-                )}
-                {/* 書き出しボタン（Pro限定） */}
-                <div className="flex items-center gap-2 relative">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">レポート構造</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  暫定構成（学術テンプレート）
+                </p>
+              </div>
+              {/* 書き出しボタン（Pro限定） */}
+              <div className="flex items-center gap-2 relative">
                   <button
                     disabled={plan === 'free'}
                     onClick={() => {
@@ -491,15 +491,7 @@ export default function Home() {
                     </div>
                   )}
                 </div>
-              </div>
             </div>
-            {outline.hasFallback && (
-              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
-                <p className="text-sm text-amber-800">
-                  AI生成に失敗したため、暫定構成を表示しています。論点は学術レポートで頻出するパターンに基づいています。
-                </p>
-              </div>
-            )}
             <div className="space-y-6">
               {outline.sections.map((section, index) => (
                 <div key={index} className="border-l-4 border-blue-500 pl-4">
@@ -515,13 +507,9 @@ export default function Home() {
                         </li>
                       ))}
                     </ul>
-                  ) : section.isFallback ? (
-                    <p className="text-amber-600 text-sm italic bg-amber-50 px-3 py-2 rounded">
-                      暫定構成を表示しています
-                    </p>
                   ) : (
                     <p className="text-gray-500 text-sm italic">
-                      論点が生成されませんでした。
+                      学術テンプレートの読み込み中
                     </p>
                   )}
                 </div>
@@ -569,18 +557,34 @@ export default function Home() {
               ) : (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-gray-700 mb-3">
-                    分野「{field}」に関連する参考文献候補：
+                    分野「{FIELD_DISPLAY_NAMES[field]}」に関連する参考文献リスト（構造的カテゴリ）:
                   </p>
-                  <ul className="space-y-2 text-sm text-gray-600">
-                    <li className="flex items-start">
-                      <span className="text-blue-500 mr-2">•</span>
-                      <span>参考文献提案機能は準備中です</span>
-                    </li>
-                    <li className="flex items-start">
-                      <span className="text-blue-500 mr-2">•</span>
-                      <span>Proプランでは自動で参考文献リストを生成します</span>
-                    </li>
-                  </ul>
+                  <div className="space-y-4 text-sm">
+                    <div>
+                      <h4 className="font-semibold text-gray-800 mb-2">理論的基盤</h4>
+                      <ul className="space-y-1 text-gray-600 ml-4">
+                        <li>• 基礎理論書・概説書</li>
+                        <li>• 主要な研究文献</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-800 mb-2">方法論・アプローチ</h4>
+                      <ul className="space-y-1 text-gray-600 ml-4">
+                        <li>• 分析手法に関する文献</li>
+                        <li>• 実証研究の事例</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-800 mb-2">具体的検討</h4>
+                      <ul className="space-y-1 text-gray-600 ml-4">
+                        <li>• 関連する研究論文</li>
+                        <li>• 時事資料・データ</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <p className="mt-4 text-xs text-gray-500 italic">
+                    Proプランでは、学術的に評価されやすい参考文献の構造的カテゴリを自動で提示します
+                  </p>
                 </div>
               )}
             </div>
@@ -595,7 +599,7 @@ export default function Home() {
                 1日の制限に達しました
               </h3>
               <p className="text-gray-700 mb-6">
-                Freeプランでは1日5回まで生成可能です。本日の生成回数が上限に達しました。
+                Freeプランでは1日5回まで構造を提示できます。本日の設計回数が上限に達しました。
               </p>
               <div className="flex space-x-3">
                 <button
@@ -617,7 +621,7 @@ export default function Home() {
             </div>
           </div>
         )}
-      </div>
+        </div>
     </div>
   );
 }

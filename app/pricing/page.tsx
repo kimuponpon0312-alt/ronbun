@@ -5,20 +5,19 @@ import Link from 'next/link';
 export default function PricingPage() {
   const features = {
     free: [
-      '1日5回までの生成',
-      '基本的なレポート構成',
+      '1日5回まで構造を提示',
+      '分野別テンプレート（学術テンプレート）',
       '3つのセクション（序論・本論・結論）',
-      '基本的な分野サポート',
-      '理論重視型のみ',
+      '全分野サポート（文学・法学・哲学・社会学・歴史学）',
+      '理論重視型の重み付けのみ',
     ],
     pro: [
-      '無制限生成',
-      '高度なレポート構成',
-      'カスタムセクション数',
-      '全分野サポート（法学・経済学・文学・社会学）',
-      '4種類の指導教員タイプ',
+      '無制限で構造を提示',
+      '実務重視型の重み付けに対応',
+      '全分野の学術テンプレート',
+      '参考文献リスト（構造的カテゴリ）の提示',
+      'PDF / Word 出力（学術評価に適した形式）',
       '優先サポート',
-      '最新機能への早期アクセス',
     ],
   };
 
@@ -154,7 +153,7 @@ export default function PricingPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 <tr>
-                  <td className="py-4 px-6 text-gray-700">1日の生成回数</td>
+                  <td className="py-4 px-6 text-gray-700">1日の設計回数</td>
                   <td className="py-4 px-6 text-center text-gray-600">5回まで</td>
                   <td className="py-4 px-6 text-center text-purple-600 font-medium">
                     無制限
@@ -184,7 +183,7 @@ export default function PricingPage() {
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-4 px-6 text-gray-700">AI生成</td>
+                  <td className="py-4 px-6 text-gray-700">学術テンプレート</td>
                   <td className="py-4 px-6 text-center text-gray-600">✓</td>
                   <td className="py-4 px-6 text-center text-purple-600 font-medium">
                     ✓
@@ -220,15 +219,15 @@ export default function PricingPage() {
                 Freeプランから始められますか？
               </h3>
               <p className="text-gray-600">
-                はい、Freeプランはすぐにご利用いただけます。アカウント登録は不要で、そのままレポート構成の生成を開始できます。
+                はい、Freeプランはすぐにご利用いただけます。アカウント登録は不要で、そのままレポート構造の設計を開始できます。
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
                 Proプランはいつ利用可能になりますか？
               </h3>
               <p className="text-gray-600">
-                Proプランは現在準備中です。詳細は「Coming Soon」と表示されているボタンからお知らせをお待ちください。
+                Proプランは現在準備中です。詳細は「Coming Soon」と表示されているボタンからお知らせをお待ちください。Proプランでは、学術的に評価されやすい補助機能（参考文献リストの構造的カテゴリ、PDF/Word出力など）をご利用いただけます。
               </p>
             </div>
             <div>

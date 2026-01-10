@@ -1,8 +1,16 @@
 'use server';
 
 import { createClient } from '@supabase/supabase-js';
+import type { Field } from './generatePoints';
 
-type Field = '法学' | '経済学' | '文学' | '社会学';
+// 分野の内部名を日本語表示名にマッピング（統計用）
+const FIELD_DISPLAY_MAP: Record<Field, string> = {
+  literature: '文学',
+  law: '法学',
+  philosophy: '哲学',
+  sociology: '社会学',
+  history: '歴史学',
+};
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -29,7 +37,7 @@ export async function saveStatistics(field: Field): Promise<void> {
       .from('generation_stats')
       .select('*')
       .eq('date', today)
-      .eq('field', field)
+      .eq('field', FIELD_DISPLAY_MAP[field] || field) // 表示名に変換
       .maybeSingle();
 
     if (selectError && selectError.code !== 'PGRST116') {
@@ -53,7 +61,7 @@ export async function saveStatistics(field: Field): Promise<void> {
         .from('generation_stats')
         .insert({
           date: today,
-          field: field,
+          field: FIELD_DISPLAY_MAP[field] || field, // 表示名に変換
           count: 1,
         });
 
