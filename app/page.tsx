@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { generatePoints } from './actions/generatePoints';
 import { saveStatistics } from './actions/saveStatistics';
+import { saveShareData } from './actions/saveShareData';
+import ShareButtons from './components/ShareButtons';
 
 // 型定義（generatePoints.tsから直接インポートできない場合のフォールバック）
 type Field = 'literature' | 'law' | 'philosophy' | 'sociology' | 'history';
@@ -138,6 +140,28 @@ export default function Home() {
   const [designCount, setDesignCount] = useState(0); // 生成→設計に変更
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [hasShareRef, setHasShareRef] = useState(false);
+
+  // URLパラメータからref=share10をチェック
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const refParam = params.get('ref');
+      if (refParam === 'share10') {
+        setHasShareRef(true);
+        // localStorageに保存（次回以降も適用）
+        localStorage.setItem('share_ref', 'share10');
+      } else {
+        // localStorageから読み込み
+        const savedRef = localStorage.getItem('share_ref');
+        if (savedRef === 'share10') {
+          setHasShareRef(true);
+        }
+      }
+    }
+  }, []);
 
   // プランと設計回数の初期化
   useEffect(() => {
@@ -229,6 +253,25 @@ export default function Home() {
       );
       setOutline(designedOutline);
 
+      // 共有データを保存してreportIdを取得
+      try {
+        const shareData = {
+          field,
+          question,
+          wordCount,
+          instructorType,
+          outline: designedOutline,
+          createdAt: new Date().toISOString(),
+        };
+        const reportId = await saveShareData(shareData);
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        const shareLink = `${baseUrl}/share/${reportId}`;
+        setShareUrl(shareLink);
+      } catch (shareError) {
+        // 共有機能のエラーは無視（必須機能ではない）
+        console.error('[handleSubmit] 共有データ保存に失敗:', shareError);
+      }
+
       // 設計回数をカウント
       incrementDesignCount();
     } catch (err) {
@@ -244,6 +287,27 @@ export default function Home() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // リンク共有モーダルを開く
+  const handleShareClick = () => {
+    if (shareUrl) {
+      setShowShareModal(true);
+    }
+  };
+
+  // リンクをコピー（ref=share10を含む）
+  const handleCopyLink = async () => {
+    if (shareUrl) {
+      try {
+        const urlWithRef = `${shareUrl}?ref=share10`;
+        await navigator.clipboard.writeText(urlWithRef);
+        alert('リンクをクリップボードにコピーしました');
+      } catch (err) {
+        console.error('[handleCopyLink] コピーに失敗:', err);
+        alert('リンクのコピーに失敗しました');
+      }
     }
   };
 
@@ -292,6 +356,15 @@ export default function Home() {
         </div>
 
         <div className="text-center mb-8">
+          {/* シェア割引バナー */}
+          {hasShareRef && (
+            <div className="bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-lg p-4 mb-6 shadow-lg">
+              <p className="text-lg font-bold mb-1">💰 特別割引クーポン適用中</p>
+              <p className="text-sm opacity-90">
+                このリンクから登録すると、Proプランが10%割引になります
+              </p>
+            </div>
+          )}
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
             AXON
           </h1>
@@ -418,25 +491,15 @@ export default function Home() {
                   暫定構成（学術テンプレート）
                 </p>
               </div>
-              {/* 書き出しボタン（Pro限定） */}
-              <div className="flex items-center gap-2 relative">
+              {/* アクションボタン */}
+              <div className="flex items-center gap-2 relative flex-wrap">
+                {/* リンク共有ボタン */}
+                {shareUrl && (
                   <button
-                    disabled={plan === 'free'}
-                    onClick={() => {
-                      if (plan === 'free') {
-                        setShowTooltip(!showTooltip);
-                        setTimeout(() => setShowTooltip(false), 3000);
-                      }
-                      // PDF書き出し機能（未実装）
-                    }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
-                      plan === 'free'
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                        : 'bg-red-600 text-white hover:bg-red-700'
-                    }`}
-                    title={plan === 'free' ? 'Proプラン限定機能です' : 'PDF書き出し'}
+                    onClick={handleShareClick}
+                    className="flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors bg-green-600 text-white hover:bg-green-700"
+                    title="リンクを共有"
                   >
-                    {plan === 'free' && <span>🔒</span>}
                     <svg
                       className="w-5 h-5"
                       fill="none"
@@ -447,50 +510,85 @@ export default function Home() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                        d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
                       />
                     </svg>
-                    PDF
+                    リンク共有
                   </button>
-                  <button
-                    disabled={plan === 'free'}
-                    onClick={() => {
-                      if (plan === 'free') {
-                        setShowTooltip(!showTooltip);
-                        setTimeout(() => setShowTooltip(false), 3000);
-                      }
-                      // Word書き出し機能（未実装）
-                    }}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
-                      plan === 'free'
-                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                    }`}
-                    title={plan === 'free' ? 'Proプラン限定機能です' : 'Word書き出し'}
+                )}
+
+                {/* 書き出しボタン（Pro限定） */}
+                <button
+                  disabled={plan === 'free'}
+                  onClick={() => {
+                    if (plan === 'free') {
+                      setShowTooltip(!showTooltip);
+                      setTimeout(() => setShowTooltip(false), 3000);
+                    }
+                    // PDF書き出し機能（未実装）
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
+                    plan === 'free'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-red-600 text-white hover:bg-red-700'
+                  }`}
+                  title={plan === 'free' ? 'Proプラン限定機能です' : 'PDF書き出し'}
+                >
+                  {plan === 'free' && <span>🔒</span>}
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    {plan === 'free' && <span>🔒</span>}
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    Word
-                  </button>
-                  {showTooltip && plan === 'free' && (
-                    <div className="absolute top-full right-0 mt-2 bg-gray-900 text-white text-sm px-3 py-2 rounded-md shadow-lg z-10 whitespace-nowrap">
-                      Proプラン限定機能です
-                      <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
-                    </div>
-                  )}
-                </div>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    />
+                  </svg>
+                  PDF
+                </button>
+                <button
+                  disabled={plan === 'free'}
+                  onClick={() => {
+                    if (plan === 'free') {
+                      setShowTooltip(!showTooltip);
+                      setTimeout(() => setShowTooltip(false), 3000);
+                    }
+                    // Word書き出し機能（未実装）
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
+                    plan === 'free'
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                  title={plan === 'free' ? 'Proプラン限定機能です' : 'Word書き出し'}
+                >
+                  {plan === 'free' && <span>🔒</span>}
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  Word
+                </button>
+                {showTooltip && plan === 'free' && (
+                  <div className="absolute top-full right-0 mt-2 bg-gray-900 text-white text-sm px-3 py-2 rounded-md shadow-lg z-10 whitespace-nowrap">
+                    Proプラン限定機能です
+                    <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-6">
               {outline.sections.map((section, index) => (
@@ -621,7 +719,67 @@ export default function Home() {
             </div>
           </div>
         )}
-        </div>
+
+        {/* 共有モーダル */}
+        {showShareModal && shareUrl && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">
+                  リンクを共有
+                </h3>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {/* 共有リンク */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  共有リンク
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={`${shareUrl}?ref=share10`}
+                    readOnly
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm"
+                  />
+                  <button
+                    onClick={handleCopyLink}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    コピー
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  このリンクを共有すると、グループレポートの構造をチームメンバーと確認できます。共有してくれた方にPro 10%割引を適用します。
+                </p>
+              </div>
+
+              {/* SNSシェアボタン */}
+              <div>
+                <ShareButtons shareUrl={shareUrl} />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
