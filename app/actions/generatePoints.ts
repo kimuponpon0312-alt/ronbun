@@ -255,29 +255,9 @@ export async function generatePoints(
       points,
       isFallback: false,
     };
-  } catch (error: unknown) {
-    console.error('[generatePoints] OpenAI API Error - セクション:', sectionTitle);
-    
-    // API呼び出しエラー
-    if (error instanceof OpenAI.APIError) {
-      console.error('[generatePoints] OpenAI.APIError 発生 - フォールバック論点を返します');
-      console.error('[generatePoints] error.message:', error.message);
-      console.error('[generatePoints] error.status:', error.status);
-      if (error.response) {
-        console.error('[generatePoints] error.response:', error.response);
-      }
-      return {
-        points: getFallbackPoints(field, sectionTitle),
-        isFallback: true,
-      };
-    }
-    
-    // その他のエラー
-    console.error('[generatePoints] 予期しないエラー - フォールバック論点を返します');
-    if (error instanceof Error) {
-      console.error('[generatePoints] error.message:', error.message);
-    }
+  } catch (error: any) {
     console.error('[generatePoints] error:', error);
+
     return {
       points: getFallbackPoints(field, sectionTitle),
       isFallback: true,
