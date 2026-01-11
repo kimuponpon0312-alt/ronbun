@@ -7,6 +7,10 @@ import { generatePoints } from './actions/generatePoints';
 import { saveStatistics } from './actions/saveStatistics';
 import { saveShareData } from './actions/saveShareData';
 import ShareButtons from './components/ShareButtons';
+import { diffOutline, type ReportOutline as DiffReportOutline, type OutlineDiffResult } from './utils/diffOutline';
+import { suggestReferences } from './utils/referenceSuggest';
+import { classifyPoints, type TaggedPoint } from './utils/classifyPoints';
+import { generatePointsFromComment } from './actions/generatePointsFromComment';
 
 // 型定義（generatePoints.tsから直接インポートできない場合のフォールバック）
 type Field = 'literature' | 'law' | 'philosophy' | 'sociology' | 'history';
@@ -149,6 +153,19 @@ export default function Home() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [hasShareRef, setHasShareRef] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  // 履歴差分表示
+  const [previousOutline, setPreviousOutline] = useState<ReportOutline | null>(null);
+  const [diffResult, setDiffResult] = useState<OutlineDiffResult | null>(null);
+  const [showDiff, setShowDiff] = useState(false);
+
+  // 論点分類
+  const [classifiedPoints, setClassifiedPoints] = useState<Record<string, TaggedPoint[]>>({});
+  const [showTagFilter, setShowTagFilter] = useState(false);
+
+  // 参考文献サジェスト
+  const [referenceList, setReferenceList] = useState<Array<{ category: string; references: string[] }>>([]);
+  const [showReferences, setShowReferences] = useState(false);
+
 
   // URLパラメータからref=share10をチェック
   useEffect(() => {
@@ -309,6 +326,10 @@ export default function Home() {
         wordCount,
         instructorType
       );
+      // 前回の構成を保存（差分表示用）
+      if (outline) {
+        setPreviousOutline({ ...outline });
+      }
       setOutline(designedOutline);
 
       // 共有データを保存してreportIdを取得
@@ -364,6 +385,39 @@ export default function Home() {
       console.error('[handleCopyLink] コピーに失敗:', err);
       alert('リンクのコピーに失敗しました');
     }
+  };
+
+  // 履歴差分表示
+  const handleShowDiff = () => {
+    if (!outline || !previousOutline) return;
+    const diff = diffOutline(previousOutline, outline);
+    setDiffResult(diff);
+    setShowDiff(true);
+  };
+
+  // 論点分類実行
+  const handleClassifyPoints = () => {
+    if (!outline) return;
+    const tagged: Record<string, TaggedPoint[]> = {};
+    outline.sections.forEach(section => {
+      if (section.points && section.points.length > 0) {
+        tagged[section.title] = classifyPoints(section.points);
+      }
+    });
+    setClassifiedPoints(tagged);
+    setShowTagFilter(true);
+  };
+
+  // 参考文献サジェスト生成
+  const handleGenerateReferences = () => {
+    if (!outline) return;
+    const allPoints: string[] = [];
+    outline.sections.forEach(section => {
+      allPoints.push(...(section.points || []));
+    });
+    const suggestions = suggestReferences(field, allPoints);
+    setReferenceList(suggestions);
+    setShowReferences(true);
   };
 
   return (
@@ -633,6 +687,53 @@ export default function Home() {
                   {shareUrl ? 'リンク共有' : 'サービスを共有'}
                 </button>
 
+                {/* 差分表示ボタン */}
+                {previousOutline && (
+                  <button
+                    onClick={handleShowDiff}
+                    className="flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors bg-yellow-600 text-white hover:bg-yellow-700"
+                    title="前回との差分を表示"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    差分表示
+                  </button>
+                )}
+
+                {/* 論点分類ボタン */}
+                <button
+                  onClick={handleClassifyPoints}
+                  disabled={!outline}
+                  className="flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  title="論点をタグ付けして分類"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                    />
+                  </svg>
+                  論点分類
+                </button>
+
                 {/* 書き出しボタン（Pro限定） */}
                 <button
                   disabled={plan === 'free'}
@@ -714,12 +815,31 @@ export default function Home() {
                   </h3>
                   {section.points && section.points.length > 0 ? (
                     <ul className="space-y-2">
-                      {section.points.map((point, pointIndex) => (
-                        <li key={pointIndex} className="text-gray-700 flex items-start">
-                          <span className="text-blue-500 mr-2">•</span>
-                          <span>{point}</span>
-                        </li>
-                      ))}
+                      {section.points.map((point, pointIndex) => {
+                        // 論点分類が実行されている場合はタグを表示
+                        const taggedPoint = classifiedPoints[section.title]?.[pointIndex];
+                        return (
+                          <li key={pointIndex} className="text-gray-700 flex items-start">
+                            <span className="text-blue-500 mr-2">•</span>
+                            <div className="flex-1">
+                              <span>{point}</span>
+                              {taggedPoint && taggedPoint.tags && taggedPoint.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {taggedPoint.tags.map((tagInfo, tagIndex) => (
+                                    <span
+                                      key={tagIndex}
+                                      className="px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-700"
+                                      title={`信頼度: ${(tagInfo.confidence * 100).toFixed(0)}%`}
+                                    >
+                                      {tagInfo.tag} ({Math.round(tagInfo.confidence * 100)}%)
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                   ) : (
                     <p className="text-gray-500 text-sm italic">
@@ -770,36 +890,61 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-700 mb-3">
-                    分野「{FIELD_DISPLAY_NAMES[field]}」に関連する参考文献リスト（構造的カテゴリ）:
-                  </p>
-                  <div className="space-y-4 text-sm">
-                    <div>
-                      <h4 className="font-semibold text-gray-800 mb-2">理論的基盤</h4>
-                      <ul className="space-y-1 text-gray-600 ml-4">
-                        <li>• 基礎理論書・概説書</li>
-                        <li>• 主要な研究文献</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-800 mb-2">方法論・アプローチ</h4>
-                      <ul className="space-y-1 text-gray-600 ml-4">
-                        <li>• 分析手法に関する文献</li>
-                        <li>• 実証研究の事例</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-800 mb-2">具体的検討</h4>
-                      <ul className="space-y-1 text-gray-600 ml-4">
-                        <li>• 関連する研究論文</li>
-                        <li>• 時事資料・データ</li>
-                      </ul>
-                    </div>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm text-gray-700">
+                      分野「{FIELD_DISPLAY_NAMES[field]}」に関連する参考文献リスト（構造的カテゴリ）:
+                    </p>
+                    <button
+                      onClick={handleGenerateReferences}
+                      disabled={!outline}
+                      className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      サジェスト生成
+                    </button>
                   </div>
+
+                  {showReferences && referenceList.length > 0 ? (
+                    <div className="space-y-4 text-sm">
+                      {referenceList.map((suggestion, index) => (
+                        <div key={index}>
+                          <h4 className="font-semibold text-gray-800 mb-2">{suggestion.category}</h4>
+                          <ul className="space-y-1 text-gray-600 ml-4">
+                            {suggestion.references.map((ref, refIndex) => (
+                              <li key={refIndex}>• {ref}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-4 text-sm">
+                      <div>
+                        <h4 className="font-semibold text-gray-800 mb-2">理論的基盤</h4>
+                        <ul className="space-y-1 text-gray-600 ml-4">
+                          <li>• 基礎理論書・概説書</li>
+                          <li>• 主要な研究文献</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800 mb-2">方法論・アプローチ</h4>
+                        <ul className="space-y-1 text-gray-600 ml-4">
+                          <li>• 分析手法に関する文献</li>
+                          <li>• 実証研究の事例</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-800 mb-2">具体的検討</h4>
+                        <ul className="space-y-1 text-gray-600 ml-4">
+                          <li>• 関連する研究論文</li>
+                          <li>• 時事資料・データ</li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
                   <p className="mt-4 text-xs text-gray-500 italic">
                     Proプランでは、学術的に評価されやすい参考文献の構造的カテゴリを自動で提示します
-          </p>
-        </div>
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -929,6 +1074,111 @@ export default function Home() {
                   {...(shareUrl ? {} : { description: 'AXON（文系レポ助）は、文系レポートの構造設計を支援するツールです。書けないを、構造で解決します。無料で5回まで利用可能。' })}
                 />
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 履歴差分表示モーダル */}
+        {showDiff && diffResult && previousOutline && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">
+                  構成の差分表示
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowDiff(false);
+                    setDiffResult(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {diffResult.hasChanges ? (
+                <div className="space-y-6">
+                  {diffResult.diffs.map((diff, index) => (
+                    <div key={index} className="border-l-4 border-blue-500 pl-4">
+                      <h4 className="text-lg font-semibold text-gray-800 mb-3">
+                        {diff.sectionTitle}
+                      </h4>
+
+                      {/* 追加された論点 */}
+                      {diff.addedPoints.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-sm font-medium text-green-700 mb-2">追加された論点:</p>
+                          <ul className="space-y-1">
+                            {diff.addedPoints.map((point, pointIndex) => (
+                              <li key={pointIndex} className="text-sm text-gray-700 flex items-start">
+                                <span className="text-green-500 mr-2">+</span>
+                                <span className="bg-green-50 px-2 py-1 rounded">{point}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* 削除された論点 */}
+                      {diff.removedPoints.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-sm font-medium text-red-700 mb-2">削除された論点:</p>
+                          <ul className="space-y-1">
+                            {diff.removedPoints.map((point, pointIndex) => (
+                              <li key={pointIndex} className="text-sm text-gray-700 flex items-start">
+                                <span className="text-red-500 mr-2">-</span>
+                                <span className="bg-red-50 px-2 py-1 rounded line-through">{point}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* 変更された論点 */}
+                      {diff.modifiedPoints.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-sm font-medium text-blue-700 mb-2">変更された論点:</p>
+                          <ul className="space-y-3">
+                            {diff.modifiedPoints.map((modified, modIndex) => (
+                              <li key={modIndex} className="text-sm">
+                                <div className="flex items-start mb-1">
+                                  <span className="text-red-500 mr-2">-</span>
+                                  <span className="bg-red-50 px-2 py-1 rounded line-through text-gray-600">
+                                    {modified.before}
+                                  </span>
+                                </div>
+                                <div className="flex items-start">
+                                  <span className="text-green-500 mr-2">+</span>
+                                  <span className="bg-green-50 px-2 py-1 rounded text-gray-700">
+                                    {modified.after}
+                                  </span>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-600 text-center py-8">
+                  変更はありません。
+                </p>
+              )}
             </div>
           </div>
         )}
