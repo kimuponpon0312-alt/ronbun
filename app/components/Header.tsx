@@ -61,8 +61,21 @@ export default function Header() {
                   <div className="flex items-center space-x-4">
                     <Link
                       href="/mypage"
-                      className="text-sm font-medium text-gray-700 hover:text-purple-600 transition-colors"
+                      className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-purple-600 transition-colors"
                     >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                        />
+                      </svg>
                       マイページ
                     </Link>
                     <button
@@ -73,20 +86,12 @@ export default function Header() {
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center space-x-4">
-                    <Link
-                      href="/auth/signin"
-                      className="text-sm font-medium text-gray-700 hover:text-purple-600 transition-colors"
-                    >
-                      ログイン
-                    </Link>
-                    <Link
-                      href="/auth/signin"
-                      className="text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-md transition-colors"
-                    >
-                      登録
-                    </Link>
-                  </div>
+                  <Link
+                    href="/auth/signin"
+                    className="text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-md transition-colors"
+                  >
+                    ログイン
+                  </Link>
                 )}
               </>
             )}

@@ -153,6 +153,10 @@ export default function Home() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [hasShareRef, setHasShareRef] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  // ログイン促進モーダル
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  // 前回の続きから生成
+  const [showContinueModal, setShowContinueModal] = useState(false);
   // 履歴差分表示
   const [previousOutline, setPreviousOutline] = useState<ReportOutline | null>(null);
   const [diffResult, setDiffResult] = useState<OutlineDiffResult | null>(null);
@@ -332,6 +336,13 @@ export default function Home() {
       }
       setOutline(designedOutline);
 
+      // レポート保存（ログイン必須）
+      if (!session) {
+        setShowLoginModal(true);
+        setIsLoading(false);
+        return;
+      }
+
       // 共有データを保存してreportIdを取得
       try {
         const shareData = {
@@ -418,6 +429,15 @@ export default function Home() {
     const suggestions = suggestReferences(field, allPoints);
     setReferenceList(suggestions);
     setShowReferences(true);
+  };
+
+  // 前回の続きから生成（ログインチェック付き）
+  const handleContinueGeneration = () => {
+    if (!session) {
+      setShowLoginModal(true);
+      return;
+    }
+    setShowContinueModal(true);
   };
 
   return (
@@ -943,8 +963,8 @@ export default function Home() {
                   )}
                   <p className="mt-4 text-xs text-gray-500 italic">
                     Proプランでは、学術的に評価されやすい参考文献の構造的カテゴリを自動で提示します
-                  </p>
-                </div>
+          </p>
+        </div>
               )}
             </div>
           </div>
@@ -1003,6 +1023,55 @@ export default function Home() {
                 </Link>
                 <button
                   onClick={() => setShowRegisterModal(false)}
+                  className="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-md font-medium hover:bg-gray-300 transition-colors"
+                >
+                  閉じる
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ログイン促進モーダル */}
+        {showLoginModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">
+                  ログインが必要です
+                </h3>
+                <button
+                  onClick={() => setShowLoginModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-gray-700 mb-6">
+                思考の履歴を保存するにはログインが必要です
+              </p>
+              <div className="flex flex-col space-y-3">
+                <Link
+                  href="/auth/signin"
+                  className="w-full bg-purple-600 text-white py-2 px-4 rounded-md font-medium hover:bg-purple-700 transition-colors text-center"
+                  onClick={() => setShowLoginModal(false)}
+                >
+                  ログインする
+                </Link>
+                <button
+                  onClick={() => setShowLoginModal(false)}
                   className="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-md font-medium hover:bg-gray-300 transition-colors"
                 >
                   閉じる

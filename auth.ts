@@ -1,21 +1,12 @@
 import NextAuth from 'next-auth';
-import EmailProvider from 'next-auth/providers/email';
+import GoogleProvider from 'next-auth/providers/google';
 import type { NextAuthConfig } from 'next-auth';
 
 export const authConfig: NextAuthConfig = {
   providers: [
-    EmailProvider({
-      server: {
-        host: process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com',
-        port: Number(process.env.EMAIL_SERVER_PORT) || 587,
-        auth: {
-          user: process.env.EMAIL_SERVER_USER,
-          pass: process.env.EMAIL_SERVER_PASSWORD,
-        },
-      },
-      from: process.env.EMAIL_FROM || 'noreply@axon.example.com',
-      // マジックリンクの設定
-      maxAge: 24 * 60 * 60, // 24時間
+    GoogleProvider({
+      clientId: process.env.AUTH_GOOGLE_ID || '',
+      clientSecret: process.env.AUTH_GOOGLE_SECRET || '',
     }),
   ],
   pages: {
@@ -42,7 +33,7 @@ export const authConfig: NextAuthConfig = {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30日
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
 };
 
 export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
