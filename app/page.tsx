@@ -7,13 +7,6 @@ import { useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { Document, Paragraph, TextRun, HeadingLevel, Packer } from 'docx';
 import { saveAs } from 'file-saver';
-import pdfMake from 'pdfmake/build/pdfmake';
-import pdfFonts from 'pdfmake/build/vfs_fonts';
-
-// pdfmakeのvfs_fontsを設定
-if (typeof window !== 'undefined') {
-  pdfMake.vfs = pdfFonts.pdfMake?.vfs || pdfFonts;
-}
 import { generatePoints } from './actions/generatePoints';
 import { saveStatistics } from './actions/saveStatistics';
 import { saveShareData } from './actions/saveShareData';
@@ -606,77 +599,6 @@ export default function Home() {
     }
   };
 
-  const handleExportPDF = () => {
-    if (!outline || !question) {
-      alert('まずレポートを生成してください');
-      return;
-    }
-
-    try {
-      // PDFドキュメント定義を作成
-      const content: any[] = [];
-
-      // タイトル（question）を追加
-      content.push({
-        text: question,
-        style: 'title',
-        margin: [0, 0, 0, 20],
-      });
-
-      // 各セクションを処理
-      outline.sections.forEach((section, sectionIndex) => {
-        // セクションタイトルを見出しとして追加
-        content.push({
-          text: section.title,
-          style: 'header',
-          margin: [0, sectionIndex === 0 ? 0 : 15, 0, 10],
-        });
-
-        // 各論点を箇条書きリストとして追加
-        if (section.points && section.points.length > 0) {
-          content.push({
-            ul: section.points.map((point) => point),
-            margin: [0, 0, 0, 10],
-          });
-        }
-      });
-
-      // PDFドキュメント定義
-      const docDefinition = {
-        content: content,
-        styles: {
-          title: {
-            fontSize: 20,
-            bold: true,
-            alignment: 'left',
-          },
-          header: {
-            fontSize: 16,
-            bold: true,
-            alignment: 'left',
-          },
-        },
-        defaultStyle: {
-          fontSize: 12,
-          alignment: 'left',
-        },
-      };
-
-      // PDFを生成してダウンロード
-      pdfMake.createPdf(docDefinition).download('report_structure.pdf');
-    } catch (error) {
-      console.error('[handleExportPDF] PDF書き出しエラー:', error);
-      if (error instanceof Error) {
-        console.error('[handleExportPDF] エラー詳細:', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name,
-        });
-      }
-      alert('PDFファイルの書き出しに失敗しました。もう一度お試しください。');
-    }
-  };
-
   const handleShowDiff = () => {
     if (!outline || !previousOutline) return;
     const diff = diffOutline(previousOutline, outline);
@@ -1243,39 +1165,6 @@ export default function Home() {
                   論点分類
                 </button>
 
-                <button
-                  disabled={plan === 'free'}
-                  onClick={() => {
-                    if (plan === 'free') {
-                      setShowTooltip(!showTooltip);
-                      setTimeout(() => setShowTooltip(false), 3000);
-                    } else {
-                      handleExportPDF();
-                    }
-                  }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors whitespace-nowrap ${
-                    plan === 'free'
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      : 'bg-red-600 text-white hover:bg-red-700'
-                  }`}
-                  title={plan === 'free' ? 'Proプラン限定機能です' : 'PDF書き出し'}
-                >
-                  {plan === 'free' && <span>🔒</span>}
-                  <svg
-                    className="w-5 h-5 flex-shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                    />
-                  </svg>
-                  PDF
-                </button>
                 <button
                   disabled={plan === 'free'}
                   onClick={() => {
