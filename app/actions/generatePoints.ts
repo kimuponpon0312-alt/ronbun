@@ -56,6 +56,22 @@ function getTemplateItems(
   return sortedItems.map(item => item.text);
 }
 
+// 開発用ダミーデータを返す関数
+function getDummyData(): GeneratePointsResult {
+  return {
+    points: [
+      '【テスト用】序論の論点1: この問題の歴史的背景を確認する',
+      '【テスト用】序論の論点2: 現代における課題を定義する',
+      '【テスト用】序論の論点3: 本稿の目的を提示する',
+      '【テスト用】本論の論点1: 先行研究の限界を指摘する',
+      '【テスト用】本論の論点2: 新しいアプローチを提案する',
+      '【テスト用】結論の論点1: 議論の総括と今後の展望',
+    ],
+    isFallback: true,
+    coreQuestion: '【テスト用】なぜAPIなしでも開発が進められるのか？',
+  };
+}
+
 export async function generatePoints(
   field: Field,
   question: string,
@@ -63,15 +79,19 @@ export async function generatePoints(
   sectionTitle: string,
   instructorType: InstructorType
 ): Promise<GeneratePointsResult> {
+  // OpenAI APIキーの確認
+  const openaiApiKey = process.env.OPENAI_API_KEY;
+  if (!openaiApiKey) {
+    console.warn('[generatePoints] OPENAI_API_KEYが設定されていません。ダミーデータを返します。');
+    return getDummyData();
+  }
+
   try {
     // テンプレートから該当するセクションの項目を取得
     const fieldTemplate = templates[field];
     if (!fieldTemplate) {
       console.error(`[generatePoints] 分野 "${field}" のテンプレートが見つかりません`);
-      return {
-        points: ['テンプレートの読み込みに失敗しました'],
-        isFallback: false,
-      };
+      return getDummyData();
     }
 
     // セクションタイトルを英語キーにマッピング
@@ -84,10 +104,7 @@ export async function generatePoints(
     const sectionKey = sectionMap[sectionTitle];
     if (!sectionKey || !fieldTemplate[sectionKey]) {
       console.error(`[generatePoints] セクション "${sectionTitle}" のテンプレートが見つかりません`);
-      return {
-        points: ['テンプレートの読み込みに失敗しました'],
-        isFallback: false,
-      };
+      return getDummyData();
     }
 
     // 重み付けでソートされた論点を取得
@@ -101,31 +118,9 @@ export async function generatePoints(
     };
   } catch (error) {
     // エラーはconsole.errorに記録するが、UIには表示しない
-    console.error('[generatePoints] エラーが発生しました:', error);
+    console.error('[generatePoints] エラーが発生しました（ダミーデータを返します）:', error);
     
-    // 必ずテンプレートを返す（フォールバック）
-    const defaultTemplate = templates[field];
-    if (defaultTemplate) {
-      const sectionMap: Record<string, keyof Omit<FieldTemplate, 'coreQuestion'>> = {
-        '序論': 'intro',
-        '本論': 'body',
-        '結論': 'conclusion',
-      };
-      const sectionKey = sectionMap[sectionTitle];
-      if (sectionKey && defaultTemplate[sectionKey]) {
-        const items = defaultTemplate[sectionKey] as TemplateItem[];
-        return {
-          points: getTemplateItems(items, instructorType),
-          isFallback: false,
-          coreQuestion: defaultTemplate.coreQuestion,
-        };
-      }
-    }
-
-    // 最終フォールバック
-    return {
-      points: ['学術テンプレートの読み込み中'],
-      isFallback: false,
-    };
+    // 開発用ダミーデータを返す（AI APIが失敗した場合でもテスト可能にする）
+    return getDummyData();
   }
 }

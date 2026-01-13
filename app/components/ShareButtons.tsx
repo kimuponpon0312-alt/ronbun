@@ -4,9 +4,10 @@ type ShareButtonsProps = {
   shareUrl: string;
   title?: string;
   description?: string; // サービス紹介文（レポート未生成時）
+  onShareClick?: () => void; // シェアボタンクリック時のコールバック
 };
 
-export default function ShareButtons({ shareUrl, title = 'AXON - 文系レポ助', description }: ShareButtonsProps) {
+export default function ShareButtons({ shareUrl, title = 'AXON - 文系レポ助', description, onShareClick }: ShareButtonsProps) {
   // シェアURLにref=share10を付与
   const shareUrlWithRef = `${shareUrl}?ref=share10`;
 
@@ -34,6 +35,7 @@ export default function ShareButtons({ shareUrl, title = 'AXON - 文系レポ助
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     // PCは常にブラウザで開く（_blankで新規タブ）
     window.open(url, '_blank', 'width=550,height=420');
+    onShareClick?.();
   };
 
   // LINEでシェア（PCは必ずブラウザ優先）
@@ -42,6 +44,7 @@ export default function ShareButtons({ shareUrl, title = 'AXON - 文系レポ助
     const url = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrlWithRef)}&text=${encodeURIComponent(text)}`;
     // PCは常にブラウザで開く（_blankで新規タブ）
     window.open(url, '_blank', 'width=550,height=420');
+    onShareClick?.();
   };
 
   // Instagramでシェア（PC/スマホで分岐）
@@ -92,6 +95,7 @@ export default function ShareButtons({ shareUrl, title = 'AXON - 文系レポ助
         alert('Instagramブラウザ版を開きました。');
       }
     }
+    onShareClick?.();
   };
 
   // リンクをコピー（ref=share10を含む）
@@ -99,6 +103,7 @@ export default function ShareButtons({ shareUrl, title = 'AXON - 文系レポ助
     try {
       await navigator.clipboard.writeText(shareUrlWithRef);
       alert('リンクをクリップボードにコピーしました。共有してくれた方にPro 10%割引が適用されます。');
+      onShareClick?.();
     } catch (err) {
       console.error('[handleCopyLink] コピーに失敗:', err);
       alert('リンクのコピーに失敗しました');

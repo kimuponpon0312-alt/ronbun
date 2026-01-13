@@ -53,3 +53,28 @@ CREATE TRIGGER update_report_outlines_updated_at
 BEFORE UPDATE ON report_outlines 
 FOR EACH ROW 
 EXECUTE FUNCTION update_updated_at_column();
+
+-- 共有レポート保存用テーブル
+CREATE TABLE IF NOT EXISTS shared_reports (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  content JSONB NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- インデックスを作成（パフォーマンス向上）
+CREATE INDEX IF NOT EXISTS idx_shared_reports_created_at ON shared_reports(created_at DESC);
+
+-- RLS (Row Level Security) を有効化
+ALTER TABLE shared_reports ENABLE ROW LEVEL SECURITY;
+
+-- RLSポリシー: 全員が参照可能（SELECT）
+CREATE POLICY "Anyone can view shared reports"
+  ON shared_reports
+  FOR SELECT
+  USING (true);
+
+-- RLSポリシー: 誰でも作成可能（INSERT）
+CREATE POLICY "Anyone can create shared reports"
+  ON shared_reports
+  FOR INSERT
+  WITH CHECK (true);

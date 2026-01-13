@@ -144,9 +144,9 @@ function ShareViewerContent({ shareData, reportId }: ShareViewerProps) {
           <ShareButtons shareUrl={shareUrl} />
         </div>
 
-        {/* CTA：自分でも設計する */}
+        {/* CTA：自分もレポート構成を作ってみる */}
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-lg p-8 text-center text-white">
-          <h3 className="text-2xl font-bold mb-2">自分でも構造を設計してみませんか？</h3>
+          <h3 className="text-2xl font-bold mb-2">この構成を使って自分で書いてみませんか？</h3>
           <p className="mb-6 opacity-90">
             AXONで、あなたのレポート構造も設計できます。無料で5回まで利用可能です。
           </p>
@@ -154,7 +154,7 @@ function ShareViewerContent({ shareData, reportId }: ShareViewerProps) {
             href="/"
             className="inline-block bg-white text-blue-600 px-8 py-3 rounded-md font-medium hover:bg-gray-100 transition-colors"
           >
-            今すぐ始める
+            この構成を使って自分で書く（トップへ戻る）
           </Link>
           {showDiscount && (
             <p className="mt-3 text-sm opacity-90">
