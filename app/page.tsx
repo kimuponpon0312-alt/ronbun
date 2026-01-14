@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSession, signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -805,7 +805,8 @@ export default function Home() {
   };
 
   return (
-    <div className="bg-gray-50 py-8 px-4">
+    <Suspense fallback={<div className="p-4 text-center">Loading AXON...</div>}>
+      <div className="bg-gray-50 py-8 px-4">
       {/* 画面幅を 4xl から 3xl に変更して引き締めました */}
       <div className="max-w-3xl mx-auto">
         {session && (
@@ -1844,5 +1845,6 @@ export default function Home() {
         )}
         </div>
     </div>
+    </Suspense>
   );
 }
