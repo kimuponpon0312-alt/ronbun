@@ -8,10 +8,15 @@ import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 
 // Supabaseクライアントの作成
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('Supabase env vars are missing. Check your .env file.');
+  // ビルドを通すためにエラーを投げない
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 type SavedReport = {
   id: string;

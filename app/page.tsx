@@ -19,10 +19,15 @@ import { generatePointsFromComment } from './actions/generatePointsFromComment';
 import { gradeOutline, type GradeResult } from './actions/gradeOutline';
 import { generateSentence } from './actions/generateSentence';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('Supabase env vars are missing. Check your .env file.');
+  // ビルドを通すためにエラーを投げない
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 type Field = 'literature' | 'law' | 'philosophy' | 'sociology' | 'history';
 type InstructorType = '理論重視型' | '実務重視型';
