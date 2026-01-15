@@ -3,14 +3,61 @@
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
+import UpgradeButton from './UpgradeButton';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 export default function Header() {
   const { data: session, status } = useSession();
   const [mounted, setMounted] = useState(false);
+  const [userPlan, setUserPlan] = useState<'free' | 'pro' | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // ユーザーのプランを取得
+  useEffect(() => {
+    if (!session?.user?.email || !supabase) {
+      setUserPlan(null);
+      return;
+    }
+
+    const userEmail = session.user.email;
+
+    // 一般ユーザーの場合はDBから取得
+    const fetchUserPlan = async () => {
+      try {
+        // profilesテーブルから取得
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('plan')
+          .eq('email', userEmail)
+          .maybeSingle();
+        
+        if (profileError) {
+          console.warn('[Header] profilesテーブル検索エラー:', profileError);
+        }
+        
+        if (profileData?.plan === 'free' || profileData?.plan === 'pro') {
+          setUserPlan(profileData.plan);
+        } else {
+          // DBにプラン情報がない場合は`free`を設定
+          setUserPlan('free');
+        }
+      } catch (error) {
+        console.error('[Header] DBからプランを取得できませんでした:', error);
+        // エラー時は`free`を設定
+        setUserPlan('free');
+      }
+    };
+    
+    fetchUserPlan();
+  }, [session]);
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/' });
@@ -59,6 +106,20 @@ export default function Header() {
                   <div className="w-20 h-8 bg-gray-200 animate-pulse rounded"></div>
                 ) : session ? (
                   <div className="flex items-center space-x-4">
+                    {/* プラン表示とアップグレードボタン */}
+                    {userPlan === 'free' && (
+                      <UpgradeButton
+                        variant="primary"
+                        className="text-sm px-4 py-2"
+                      >
+                        Proプラン: ¥1,000/月
+                      </UpgradeButton>
+                    )}
+                    {userPlan === 'pro' && (
+                      <span className="text-xs text-purple-600 font-medium bg-purple-50 px-3 py-1 rounded-full">
+                        Proプラン契約中
+                      </span>
+                    )}
                     <Link
                       href="/mypage"
                       className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-purple-600 transition-colors"

@@ -32,9 +32,11 @@ export async function getPublicReports(): Promise<PublicReport[]> {
   try {
     // content全体を取得して、必要なフィールドを抽出
     // パフォーマンスを考慮して、最新6件のみ取得
+    // is_publicがtrueのものだけを取得（プライバシー保護）
     const { data, error } = await supabase
       .from('shared_reports')
       .select('id, created_at, content')
+      .eq('is_public', true) // 公開設定がtrueのものだけを取得
       .order('created_at', { ascending: false })
       .limit(6);
 

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import UpgradeButton from '../components/UpgradeButton';
 
 export default function PricingPage() {
   const features = {
@@ -122,12 +123,12 @@ export default function PricingPage() {
               ))}
             </ul>
 
-            <button
-              disabled
-              className="block w-full bg-white text-purple-600 text-center py-3 px-6 rounded-lg font-bold hover:bg-gray-50 transition-colors cursor-not-allowed opacity-90"
+            <UpgradeButton
+              variant="primary"
+              className="block w-full bg-white text-purple-600 text-center py-3 px-6 rounded-lg font-bold hover:bg-gray-50 transition-colors"
             >
-              Coming Soon
-            </button>
+              Proプランにアップグレード
+            </UpgradeButton>
           </div>
         </div>
 

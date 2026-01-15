@@ -1,6 +1,7 @@
 'use client';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // タイムアウトを60秒に延長
 
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
@@ -14,6 +15,7 @@ import { saveStatistics } from './actions/saveStatistics';
 import { saveShareData } from './actions/saveShareData';
 import ShareButtons from './components/ShareButtons';
 import ReportGallery from './components/ReportGallery';
+import UpgradeButton from './components/UpgradeButton';
 import { diffOutline, type ReportOutline as DiffReportOutline, type OutlineDiffResult } from './utils/diffOutline';
 import { suggestReferences } from './utils/referenceSuggest';
 import { classifyPoints, type TaggedPoint } from './utils/classifyPoints';
@@ -32,7 +34,7 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 type Field = 'literature' | 'law' | 'philosophy' | 'sociology' | 'history';
-type InstructorType = '理論重視型' | '実務重視型';
+type InstructorType = '理論重視型' | '実務重視型' | 'カスタム';
 type Plan = 'free' | 'pro';
 
 const FIELD_DISPLAY_NAMES: Record<Field, string> = {
@@ -71,6 +73,27 @@ const STORAGE_KEY_GUEST_LAST_DESIGN_DATE = 'report_designer_guest_last_date';
 const GUEST_LIMIT = 1;
 const FREE_PLAN_LIMIT = 5;
 
+// ユーザーの実効プランを取得する関数
+const getUserEffectivePlan = (userEmail: string | null | undefined, savedPlan: Plan | null): Plan => {
+  // 一般ユーザーはlocalStorageから`pro`を読み込まない（DBの値のみを信頼）
+  // localStorageに`pro`が保存されていても無視し、`free`を返す
+  // 実際のプランはDBから取得する必要がある（Stripe決済成功時のみ`pro`に更新される）
+  return 'free';
+};
+
+// ユーザーがProプランかどうかを判定する関数
+// 注意: 一般ユーザーの場合は、DBからプランを取得する必要がある
+// 現在の実装では、currentPlanパラメータを使用するが、一般ユーザーの場合はDBの値のみを信頼
+const isProUser = (userEmail: string | null | undefined, currentPlan: Plan, dbPlan?: Plan | null): boolean => {
+  // 一般ユーザーはDBの値のみを信頼（localStorageの値は無視）
+  // dbPlanが指定されている場合はそれを使用、ない場合は`free`を返す
+  if (dbPlan !== undefined && dbPlan !== null) {
+    return dbPlan === 'pro';
+  }
+  // DBから取得できない場合は、安全のため`free`を返す
+  return false;
+};
+
 const sectionTemplates: Record<Field, (length: number) => Section[]> = {
   literature: (length) => [
     { title: '序論', points: [] },
@@ -103,7 +126,9 @@ async function designOutline(
   field: Field,
   question: string,
   wordCount: number,
-  instructorType: InstructorType
+  instructorType: InstructorType,
+  customInstructorType?: string,
+  additionalInstructions?: string
 ): Promise<ReportOutline> {
   let sections = sectionTemplates[field](wordCount);
 
@@ -112,6 +137,8 @@ async function designOutline(
   }
 
   let coreQuestion: string | undefined;
+  let limitError: Error | null = null;
+  
   const sectionsWithPoints = await Promise.all(
     sections.map(async (section): Promise<Section> => {
       try {
@@ -120,7 +147,9 @@ async function designOutline(
           question,
           wordCount,
           section.title,
-          instructorType as Parameters<typeof generatePoints>[4]
+          instructorType as Parameters<typeof generatePoints>[4],
+          customInstructorType,
+          additionalInstructions
         )) as unknown as { points: string[]; isFallback: boolean; coreQuestion?: string };
         
         if (result && result.coreQuestion) {
@@ -131,6 +160,11 @@ async function designOutline(
           points: result?.points || ['学術テンプレートの読み込み中'],
         };
       } catch (error) {
+        // 制限エラーの場合は保存して後でthrow
+        if (error instanceof Error && (error as any).code === 'LIMIT_EXCEEDED') {
+          limitError = error;
+          throw error; // 制限エラーは再throw
+        }
         console.error(`[designOutline] Error in "${section.title}":`, error);
         return {
           ...section,
@@ -147,7 +181,7 @@ async function designOutline(
 }
 
 export default function Home() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const [field, setField] = useState<Field>('law');
   const [question, setQuestion] = useState('');
   const [wordCount, setWordCount] = useState(3000);
@@ -155,6 +189,7 @@ export default function Home() {
   const [outline, setOutline] = useState<ReportOutline | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [plan, setPlan] = useState<Plan>('free');
+  const [dbPlan, setDbPlan] = useState<Plan | null>(null); // DBから取得したプラン
   const [designCount, setDesignCount] = useState(0);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
@@ -178,6 +213,9 @@ export default function Home() {
   const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
   const [generatingSentence, setGeneratingSentence] = useState<{ sectionIndex: number; pointIndex: number } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState<boolean>(false); // 公開設定（デフォルトはfalse）
+  const [customInstructorType, setCustomInstructorType] = useState<string>(''); // カスタム教員タイプ
+  const [additionalInstructions, setAdditionalInstructions] = useState<string>(''); // 追加指示
   const searchParams = useSearchParams();
 
   // URLクエリパラメータからidを取得してデータを復元
@@ -237,13 +275,69 @@ export default function Home() {
     if (status === 'loading') return;
 
     const isLoggedIn = !!session;
+    const userEmail = session?.user?.email;
+    const sessionPlan = (session?.user as any)?.plan as Plan | undefined; // セッションからプラン情報を取得
     const today = new Date().toISOString().split('T')[0];
 
     if (isLoggedIn) {
       const savedPlan = localStorage.getItem(STORAGE_KEY_PLAN) as Plan | null;
-      if (savedPlan === 'free' || savedPlan === 'pro') {
-        setPlan(savedPlan);
+      
+      // 一般ユーザーの場合
+      if (userEmail && supabaseUrl && supabaseKey) {
+        // まずセッションからプラン情報を取得（優先）
+        if (sessionPlan === 'free' || sessionPlan === 'pro') {
+          console.log('[useEffect] セッションからプラン情報を取得:', sessionPlan);
+          setDbPlan(sessionPlan);
+          setPlan(sessionPlan);
+        } else {
+          // セッションにプラン情報がない場合は、まずセッションをリフレッシュしてからDBから取得
+          const fetchUserPlan = async () => {
+            try {
+              // セッションをリフレッシュしてからDBから取得
+              console.log('[useEffect] セッションにプラン情報がないため、セッションをリフレッシュしてからDBから取得');
+              
+              // セッションをリフレッシュ（update関数が利用可能な場合）
+              // 注: update関数はuseSessionから取得する必要がある
+              
+              console.log('[useEffect] DBからプランを取得開始');
+              // profilesテーブルから取得
+              const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .select('plan')
+                .eq('email', userEmail)
+                .maybeSingle();
+              
+              if (profileError) {
+                console.warn('[useEffect] profilesテーブル検索エラー:', profileError);
+              }
+              
+              if (profileData?.plan === 'free' || profileData?.plan === 'pro') {
+                console.log('[useEffect] profilesテーブルからプランを取得:', profileData.plan);
+                setDbPlan(profileData.plan);
+                setPlan(profileData.plan);
+              } else {
+                // DBにプラン情報がない場合は`free`を設定
+                console.log('[useEffect] プラン情報が見つかりません。デフォルトでfreeを設定');
+                setDbPlan('free');
+                setPlan('free');
+              }
+            } catch (error) {
+              console.error('[useEffect] DBからプランを取得できませんでした:', error);
+              // エラー時は`free`を設定
+              setDbPlan('free');
+              setPlan('free');
+            }
+          };
+          
+          fetchUserPlan();
+        }
       }
+      
+      // 一般ユーザーの場合、localStorageに`pro`が保存されていても削除
+      if (savedPlan === 'pro') {
+        localStorage.setItem(STORAGE_KEY_PLAN, 'free');
+      }
+      
       const lastDate = localStorage.getItem(STORAGE_KEY_LAST_DESIGN_DATE);
       if (lastDate === today) {
         const count = parseInt(localStorage.getItem(STORAGE_KEY_DESIGN_COUNT) || '0', 10);
@@ -264,13 +358,48 @@ export default function Home() {
         localStorage.setItem(STORAGE_KEY_GUEST_LAST_DESIGN_DATE, today);
       }
     }
-  }, [session, status]);
+  }, [session, status, (session?.user as any)?.plan]); // セッションのプラン情報が変更された時にも再実行
 
   useEffect(() => {
     if (plan === 'free') {
       setInstructorType('理論重視型');
     }
   }, [plan]);
+
+  // セッションのプラン情報が変更された時に状態を更新
+  useEffect(() => {
+    const sessionPlan = (session?.user as any)?.plan as Plan | undefined;
+    if (sessionPlan === 'free' || sessionPlan === 'pro') {
+      console.log('[useEffect] セッションのプラン情報が変更されました:', sessionPlan);
+      setDbPlan(sessionPlan);
+      setPlan(sessionPlan);
+    }
+  }, [(session?.user as any)?.plan]);
+
+  // ページがフォーカスされた時にセッションをリフレッシュ（決済完了後の反映を確実にする）
+  useEffect(() => {
+    const handleFocus = async () => {
+      if (document.visibilityState === 'visible' && session) {
+        console.log('[useEffect] ページがフォーカスされました。セッションをリフレッシュします');
+        await update();
+      }
+    };
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && session) {
+        console.log('[useEffect] ページが表示されました。セッションをリフレッシュします');
+        await update();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [session, update]);
 
   // シェア後の回数回復：visibilitychangeイベントリスナー
   useEffect(() => {
@@ -308,8 +437,8 @@ export default function Home() {
   }, [isSharing, session]);
 
   const handlePlanChange = (newPlan: Plan) => {
-    setPlan(newPlan);
-    localStorage.setItem(STORAGE_KEY_PLAN, newPlan);
+    // プラン変更は許可されていません（DBの値のみを信頼）
+    console.warn('[handlePlanChange] プラン変更は許可されていません。DBの値のみを信頼します。');
   };
 
   const incrementDesignCount = () => {
@@ -343,8 +472,12 @@ export default function Home() {
 
   const canDesign = (): boolean => {
     const isLoggedIn = !!session;
+    const userEmail = session?.user?.email;
+    
     if (isLoggedIn) {
-      if (plan === 'pro') return true;
+      // DBのプランを使用
+      const userPlan = isProUser(userEmail, plan, dbPlan) ? 'pro' : 'free';
+      if (userPlan === 'pro') return true;
       return designCount < FREE_PLAN_LIMIT;
     } else {
       return designCount < GUEST_LIMIT;
@@ -375,7 +508,9 @@ export default function Home() {
         field,
         question,
         wordCount,
-        instructorType
+        instructorType,
+        instructorType === 'カスタム' ? customInstructorType : undefined,
+        additionalInstructions || undefined
       );
       if (outline) {
         setPreviousOutline({ ...outline });
@@ -433,7 +568,7 @@ export default function Home() {
           outline: designedOutline,
           createdAt: new Date().toISOString(),
         };
-        const reportId = await saveShareData(shareData);
+        const reportId = await saveShareData(shareData, isPublic);
         if (reportId) {
           const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
           const shareLink = `${baseUrl}/share/${reportId}?ref=share10`;
@@ -447,6 +582,15 @@ export default function Home() {
 
       incrementDesignCount();
     } catch (err) {
+      // 制限エラーの場合は適切なメッセージを表示
+      if (err instanceof Error && (err as any).code === 'LIMIT_EXCEEDED') {
+        const errorMessage = err.message || '1日の使用回数の制限に達しました。Freeプランでは1日3回まで利用できます。';
+        alert(errorMessage);
+        setShowLimitModal(true);
+        setIsLoading(false);
+        return;
+      }
+      
       console.error('[handleSubmit] 構成設計中にエラー:', err);
       setOutline({
         sections: [
@@ -494,7 +638,7 @@ export default function Home() {
         createdAt: new Date().toISOString(),
       };
       
-      const reportId = await saveShareData(shareData);
+      const reportId = await saveShareData(shareData, isPublic);
       if (reportId) {
         const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
         const shareLink = `${baseUrl}/share/${reportId}?ref=share10`;
@@ -816,36 +960,27 @@ export default function Home() {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <span className="text-sm font-medium text-gray-700">プラン:</span>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handlePlanChange('free')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      plan === 'free'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    Free
-                  </button>
-                  <button
-                    onClick={() => handlePlanChange('pro')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      plan === 'pro'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    Pro
-                  </button>
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm font-medium text-gray-900">
+                    {isProUser(session?.user?.email, plan, dbPlan) ? 'Pro' : 'Free'}
+                  </span>
+                  {!isProUser(session?.user?.email, plan, dbPlan) && (
+                    <UpgradeButton
+                      variant="primary"
+                      className="text-xs px-3 py-1"
+                    >
+                      Proにアップグレード
+                    </UpgradeButton>
+                  )}
                 </div>
               </div>
-              {plan === 'free' ? (
-                <div className="text-sm text-gray-600">
-                  本日の残り: {FREE_PLAN_LIMIT - designCount}回
-                </div>
-              ) : (
+              {isProUser(session?.user?.email, plan, dbPlan) ? (
                 <div className="text-sm text-purple-600 font-medium">
                   🔓 無制限
+                </div>
+              ) : (
+                <div className="text-sm text-gray-600">
+                  本日の残り: {FREE_PLAN_LIMIT - designCount}回
                 </div>
               )}
             </div>
@@ -1001,7 +1136,7 @@ export default function Home() {
                 <label htmlFor="instructorType" className="block text-sm font-medium text-gray-700">
                   指導教員タイプ（論点の重み付け）
                 </label>
-                {plan === 'free' && (
+                {!isProUser(session?.user?.email, plan, dbPlan) && (
                   <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded">
                     🔒 Pro限定
                   </span>
@@ -1010,14 +1145,20 @@ export default function Home() {
               <select
                 id="instructorType"
                 value={instructorType}
-                onChange={(e) => setInstructorType(e.target.value as InstructorType)}
+                onChange={(e) => {
+                  setInstructorType(e.target.value as InstructorType);
+                  if (e.target.value !== 'カスタム') {
+                    setCustomInstructorType(''); // カスタム以外を選択した場合はクリア
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                disabled={isLoading || plan === 'free'}
+                disabled={isLoading || !isProUser(session?.user?.email, plan, dbPlan)}
               >
                 <option value="理論重視型">理論重視型 - 理論的フレームワークを重視する重み付け</option>
                 <option value="実務重視型">実務重視型 - 実務的な観点を重視する重み付け</option>
+                <option value="カスタム">カスタム入力</option>
               </select>
-              {plan === 'free' && (
+              {!isProUser(session?.user?.email, plan) && (
                 <p className="mt-1 text-xs text-gray-500">
                   Freeプランでは「理論重視型」の重み付けのみ利用可能です
                 </p>
@@ -1025,7 +1166,65 @@ export default function Home() {
               <p className="mt-1 text-xs text-gray-500">
                 同じ構成項目でも、教員タイプに応じて表示順序と強調度が自動調整されます
               </p>
+              
+              {/* カスタム教員タイプの入力欄 */}
+              {instructorType === 'カスタム' && isProUser(session?.user?.email, plan, dbPlan) && (
+                <div className="mt-3">
+                  <label htmlFor="customInstructorType" className="block text-sm font-medium text-gray-700 mb-2">
+                    カスタム教員タイプ
+                  </label>
+                  <textarea
+                    id="customInstructorType"
+                    value={customInstructorType}
+                    onChange={(e) => setCustomInstructorType(e.target.value)}
+                    rows={3}
+                    placeholder="例: クリティカル・シンキングを好む、独創性を評価する、など"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={isLoading}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    指導教員の特徴や評価基準を自由に入力してください
+                  </p>
+                </div>
+              )}
             </div>
+
+            {/* 追加指示欄 */}
+            <div>
+              <label htmlFor="additionalInstructions" className="block text-sm font-medium text-gray-700 mb-2">
+                その他の要件・指示（任意）
+              </label>
+              <textarea
+                id="additionalInstructions"
+                value={additionalInstructions}
+                onChange={(e) => setAdditionalInstructions(e.target.value)}
+                rows={3}
+                placeholder="例: 断定的な表現を避ける、指定の参考文献を含める、など"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={isLoading}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                レポートの文体や特定の制約条件などを入力できます
+              </p>
+            </div>
+
+            {/* 公開設定チェックボックス */}
+            <div className="flex items-start">
+              <input
+                type="checkbox"
+                id="isPublic"
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+                disabled={isLoading}
+                className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="isPublic" className="ml-2 text-sm text-gray-700">
+                この構成案を「みんなの生成事例」に公開して、他の学生の役に立てる（匿名）
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              ※ チェックを外すと、このレポートは「みんなの生成事例」に表示されません（プライバシー保護）
+            </p>
 
             <button
               type="submit"
@@ -1174,9 +1373,9 @@ export default function Home() {
                 </button>
 
                 <button
-                  disabled={plan === 'free'}
+                  disabled={!isProUser(session?.user?.email, plan, dbPlan)}
                   onClick={() => {
-                    if (plan === 'free') {
+                    if (!isProUser(session?.user?.email, plan, dbPlan)) {
                       setShowTooltip(!showTooltip);
                       setTimeout(() => setShowTooltip(false), 3000);
                     } else {
@@ -1184,13 +1383,13 @@ export default function Home() {
                     }
                   }}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors whitespace-nowrap ${
-                    plan === 'free'
+                    !isProUser(session?.user?.email, plan, dbPlan)
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
-                  title={plan === 'free' ? 'Proプラン限定機能です' : 'Word書き出し'}
+                  title={!isProUser(session?.user?.email, plan, dbPlan) ? 'Proプラン限定機能です' : 'Word書き出し'}
                 >
-                  {plan === 'free' && <span>🔒</span>}
+                  {!isProUser(session?.user?.email, plan, dbPlan) && <span>🔒</span>}
                   <svg
                     className="w-5 h-5 flex-shrink-0"
                     fill="none"
@@ -1206,7 +1405,7 @@ export default function Home() {
                   </svg>
                   Word
                 </button>
-                {showTooltip && plan === 'free' && (
+                {showTooltip && !isProUser(session?.user?.email, plan, dbPlan) && (
                   <div className="absolute top-full right-0 mt-2 bg-gray-900 text-white text-sm px-3 py-2 rounded-md shadow-lg z-10 whitespace-nowrap">
                     Proプラン限定機能です
                     <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
@@ -1335,7 +1534,7 @@ export default function Home() {
                   <h3 className="text-xl font-semibold text-gray-800">
                     参考文献リスト提案
                   </h3>
-                  {plan === 'free' && (
+                  {!isProUser(session?.user?.email, plan, dbPlan) && (
                     <div className="relative group">
                       <span className="text-lg">🔒</span>
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-gray-900 text-white text-sm px-3 py-2 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
@@ -1345,26 +1544,26 @@ export default function Home() {
                     </div>
                   )}
                 </div>
-                {plan === 'free' && (
-                  <Link
-                    href="/pricing"
-                    className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+                {!isProUser(session?.user?.email, plan, dbPlan) && (
+                  <UpgradeButton
+                    variant="link"
+                    className="text-xs"
                   >
                     Proプランにアップグレード →
-                  </Link>
+                  </UpgradeButton>
                 )}
               </div>
-              {plan === 'free' ? (
+              {!isProUser(session?.user?.email, plan, dbPlan) ? (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
                   <p className="text-gray-600 mb-3">
                     参考文献リストの自動提案はProプラン限定機能です
                   </p>
-                  <Link
-                    href="/pricing"
-                    className="inline-block bg-purple-600 text-white px-4 py-2 rounded-md font-medium hover:bg-purple-700 transition-colors text-sm"
+                  <UpgradeButton
+                    variant="primary"
+                    className="text-sm"
                   >
-                    Proプランを確認する
-                  </Link>
+                    Proプランにアップグレード
+                  </UpgradeButton>
                 </div>
               ) : (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -1476,15 +1675,14 @@ export default function Home() {
                 >
                   閉じる
                 </button>
-                <button
-                  onClick={() => {
-                    handlePlanChange('pro');
-                    setShowLimitModal(false);
-                  }}
-                  className="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md font-medium hover:bg-purple-700 transition-colors"
-                >
-                  Proプランに切り替え
-                </button>
+                <div className="flex-1">
+                  <UpgradeButton
+                    variant="primary"
+                    className="w-full"
+                  >
+                    Proプランにアップグレード
+                  </UpgradeButton>
+                </div>
               </div>
             </div>
           </div>

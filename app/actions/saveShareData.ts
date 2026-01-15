@@ -21,7 +21,7 @@ export type ShareData = {
 };
 
 // 共有データを保存
-export async function saveShareData(data: ShareData): Promise<string | null> {
+export async function saveShareData(data: ShareData, isPublic: boolean = false): Promise<string | null> {
   // 環境変数の確認（開発環境のみログ出力）
   if (process.env.NODE_ENV === 'development') {
     console.log('[saveShareData] 環境変数チェック:', {
@@ -69,6 +69,7 @@ export async function saveShareData(data: ShareData): Promise<string | null> {
       .from('shared_reports')
       .insert({
         content: data,
+        is_public: isPublic, // 公開設定（デフォルトはfalse）
       })
       .select('id')
       .single();
