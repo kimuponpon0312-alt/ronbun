@@ -38,8 +38,8 @@ export async function POST(req: Request) {
 
     // 3. Stripeセッション作成
     const origin = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    // 確実に動くPrice ID
-    const priceId = process.env.STRIPE_PRODUCT_PRICE_ID || 'price_1SpjRvAW4xc9z8lnsQArvrK4'; 
+    // 環境変数からPrice IDを読み込む（Vercel上では本番用、ローカルではテスト用を自動で使い分け）
+    const priceId = process.env.STRIPE_PRICE_ID!; 
 
     const checkoutSession = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
